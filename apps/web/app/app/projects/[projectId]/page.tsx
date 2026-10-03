@@ -29,11 +29,13 @@ export default async function ProjectOverview({ params }: { params: Promise<{ pr
     <div className="mx-auto max-w-6xl">
       <div className="text-xs uppercase tracking-[.18em] text-violet-300">Project</div>
       <h1 className="mt-2 text-4xl font-semibold tracking-tight">{project.title}</h1>
-      <p className="mt-3 max-w-3xl text-white/45">{project.description || "Add the style bible, cast and world before scene generation."}</p>
+      <p className="mt-3 max-w-3xl text-white/45">{project.description || "Bring your script, references and voiceover, review the scenes, generate in Google Flow, then review captions and export."}</p>
 
       <div className="mt-8 rounded-2xl border border-white/10 bg-white/[.035] p-5">
         <div className="text-xs uppercase tracking-wider text-white/35">Mandatory pipeline</div>
-        <div className="mt-3 text-sm text-white/70">Script → Scene Breakdown → <strong>Human Scene Review</strong> → Continuity Compile → Cost Estimate → Generation → Storyboard → Export</div>
+        <div className="mt-3 text-sm leading-7 text-white/70">
+          Script → Style / Master Reference → Cast & World → Voiceover → Scene Breakdown → <strong>Human Scene Review</strong> → Storyboard → Flow Generation → Captions → Review → Export
+        </div>
       </div>
 
       <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">

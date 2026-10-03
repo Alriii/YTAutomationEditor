@@ -25,7 +25,7 @@ export default async function ExportPage({
       <div className="text-xs uppercase tracking-[.18em] text-violet-300">Take it with you</div>
       <h1 className="mt-2 text-3xl font-semibold">Export</h1>
       <p className="mt-2 text-sm text-white/45">
-        Build a portable ZIP with normalized scene JPEGs and a timeline-ready manifest.
+        Build a portable project package with selected scene JPEGs, the active voiceover, editable SRT subtitles, and a timeline-ready manifest.
       </p>
       <ExportPanel
         projectId={projectId}

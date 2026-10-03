@@ -55,7 +55,7 @@ For each approved scene, Continuity Studio:
 
 ### Start the local Flow bridge
 
-Install Playwright Chromium once:
+The bridge first tries to use an installed Brave, Chrome, or Edge browser on Windows. If none is available, install Playwright Chromium once:
 
 ```bash
 pnpm flow:install
@@ -218,8 +218,13 @@ pnpm dev
 For Flow generation, in another terminal:
 
 ```bash
-pnpm flow:install
 pnpm flow:bridge
+```
+
+If the bridge reports that no browser can be launched, install its fallback Chromium once:
+
+```bash
+pnpm flow:install
 ```
 
 Open:
@@ -289,16 +294,18 @@ If a generation surface limits ingredient count, identity continuity wins first.
 
 ## Export
 
-The current ZIP export contains normalized scene images and a manifest:
+The current ZIP export contains the selected scene images, active voiceover when present, editable SRT subtitles when present, and a manifest:
 
 ```text
 SCENE_001.jpg
 SCENE_002.jpg
 ...
+voiceover.mp3   # or .wav/.m4a when present
+subtitles.srt   # when captions exist
 manifest.json
 ```
 
-The in-app Review player already combines voiceover and subtitles for review. A final rendered MP4 exporter remains a later step.
+The manifest also preserves per-scene timing and non-destructive framing settings. The in-app Review player combines those assets for review. A final rendered MP4 exporter remains a later step.
 
 ## Verification
 

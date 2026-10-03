@@ -34,7 +34,10 @@ export async function POST(request: Request, context: Context) {
 
     await db.scene.update({
       where: { id: scene.id },
-      data: { selectedAssetId: asset.id },
+      data: {
+        selectedAssetId: asset.id,
+        status: "COMPLETE",
+      },
     });
 
     return Response.json({ selectedAssetId: asset.id });
