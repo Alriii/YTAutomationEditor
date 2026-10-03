@@ -132,7 +132,14 @@ export default async function ReviewPage({
       const fit: "cover" | "contain" =
         raw.fit === "contain" ? "contain" : "cover";
 
-      const motion =
+      const motion:
+        | "NONE"
+        | "ZOOM_IN"
+        | "ZOOM_OUT"
+        | "PAN_LEFT"
+        | "PAN_RIGHT"
+        | "PAN_UP"
+        | "PAN_DOWN" =
         raw.motion === "ZOOM_IN" ||
         raw.motion === "ZOOM_OUT" ||
         raw.motion === "PAN_LEFT" ||
@@ -141,7 +148,9 @@ export default async function ReviewPage({
         raw.motion === "PAN_DOWN"
           ? raw.motion
           : "NONE";
-      const transition = raw.transition === "FADE" ? "FADE" : "CUT";
+
+      const transition: "CUT" | "FADE" =
+        raw.transition === "FADE" ? "FADE" : "CUT";
 
       return {
         id: scene.id,
