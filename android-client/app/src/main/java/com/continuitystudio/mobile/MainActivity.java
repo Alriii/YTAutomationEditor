@@ -2,19 +2,17 @@ package com.continuitystudio.mobile;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.ContentValues;
 import android.content.Intent;
-import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
-import android.provider.MediaStore;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
@@ -22,77 +20,122 @@ import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.MediaController;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.Spinner;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.VideoView;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
+import java.io.FileInputStream;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
-    private static final int PICK_REFERENCES = 8101;
-    private static final String PREFS = "continuity_standalone";
-    private static final String PREF_SCENE = "scene";
-    private static final String PREF_MODEL = "model";
-    private static final String PREF_ASPECT = "aspect";
-    private static final String PREF_MASTER = "master";
+    private static final int SCREEN_HOME = 0;
+    private static final int SCREEN_GENERATE = 1;
+    private static final int SCREEN_STORYBOARD = 2;
+    private static final int SCREEN_EXPORT = 3;
 
-    private static final String DEFAULT_MASTER =
+    private static final int PICK_REFERENCES = 8101;
+    private static final int PICK_VOICEOVER = 8102;
+    private static final int PICK_SCENE_IMAGE = 8103;
+
+    public static final String DEFAULT_MASTER =
         "Create a polished continuity-first 2D cinematic documentary illustration for technology and business history. " +
         "Represent the supplied narration directly and accurately, never as a generic technology scene. " +
         "Use detailed editorial 2D artwork: expressive and premium, not photorealistic, not stick figures, not glossy plastic 3D, and not generic AI-looking art. " +
         "Preserve the correct historical era, hardware generation, industrial design, clothing, offices, CRT displays, components, architecture, and cultural details. " +
         "Use a strong focal subject, readable silhouettes, cinematic but believable lighting, subtle texture, and clear foreground/midground/background separation. " +
         "Treat attached references as canonical for identity, proportions, materials, colors, logos, product shape, and location design. " +
-        "Do not invent visible labels, dates, model numbers, logos, UI text, or historical details that are not supported by the narration or references. " +
+        "Do not invent visible labels, dates, model numbers, logos, UI text, or historical details not supported by narration or references. " +
         "No watermark, no captions, no random typography, no distorted hands, no duplicate people, no broken hardware geometry. " +
         "Maintain continuity across scenes: same recurring character appearance, product geometry, location layout, palette, rendering style, and lighting logic.";
 
+    private static final int BG = Color.rgb(8, 11, 20);
+    private static final int PANEL = Color.rgb(21, 24, 42);
+    private static final int PANEL_SOFT = Color.rgb(15, 19, 34);
+    private static final int ACCENT = Color.rgb(167, 91, 255);
+    private static final int ACCENT_2 = Color.rgb(124, 58, 237);
+    private static final int TEXT = Color.rgb(248, 250, 252);
+    private static final int MUTED = Color.rgb(148, 163, 184);
+    private static final int FAINT = Color.rgb(100, 116, 139);
+    private static final int SUCCESS = Color.rgb(110, 231, 183);
+    private static final int DANGER = Color.rgb(251, 113, 133);
+
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
-    private final ArrayList<Uri> referenceUris = new ArrayList<>();
 
-    private SharedPreferences preferences;
+    private ProjectStore store;
+    private ProjectStore.Project project;
     private SecureApiKeyStore apiKeyStore;
-    private EditText sceneInput;
-    private Spinner modelSpinner;
-    private Spinner aspectSpinner;
-    private TextView keyStatus;
+
+    private FrameLayout content;
+    private LinearLayout bottomNav;
+    private TextView headerProject;
+    private int currentScreen = SCREEN_HOME;
+
+    private String activeSceneId;
+    private String pendingSceneImageId;
+
+    private EditText generateNarration;
+    private Spinner generateModel;
+    private Spinner generateAspect;
+    private ImageView generatePreview;
+    private TextView generateStatus;
     private TextView referenceStatus;
-    private TextView status;
-    private ImageView preview;
-    private ProgressBar progress;
+    private ProgressBar generateProgress;
     private Button generateButton;
-    private String masterPrompt;
+
+    private ProgressBar exportProgress;
+    private TextView exportStatus;
+    private Spinner qualitySpinner;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getWindow().setStatusBarColor(Color.rgb(13, 17, 26));
-        getWindow().setNavigationBarColor(Color.rgb(13, 17, 26));
 
-        preferences = getSharedPreferences(PREFS, MODE_PRIVATE);
+        getWindow().setStatusBarColor(BG);
+        getWindow().setNavigationBarColor(BG);
+
+        store = new ProjectStore(this);
         apiKeyStore = new SecureApiKeyStore(this);
-        masterPrompt = preferences.getString(PREF_MASTER, DEFAULT_MASTER);
+        project = store.current(DEFAULT_MASTER);
 
-        buildUi();
-        restoreDefaults();
-        refreshKeyStatus();
+        buildShell();
+        showScreen(SCREEN_HOME);
     }
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private GradientDrawable rounded(int color, float radius) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(dp((int) radius));
+        drawable.setStroke(dp(1), Color.rgb(44, 49, 80));
+        return drawable;
+    }
+
+    private GradientDrawable accentDrawable() {
+        GradientDrawable drawable = new GradientDrawable(
+            GradientDrawable.Orientation.LEFT_RIGHT,
+            new int[] { ACCENT_2, Color.rgb(190, 86, 255) }
+        );
+        drawable.setCornerRadius(dp(18));
+        return drawable;
     }
 
     private TextView text(String value, float size, int color) {
@@ -103,21 +146,87 @@ public class MainActivity extends Activity {
         return view;
     }
 
-    private Button button(String label) {
-        Button view = new Button(this);
-        view.setText(label);
-        view.setAllCaps(false);
+    private TextView heading(String value, float size) {
+        TextView view = text(value, size, TEXT);
+        view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         return view;
     }
 
-    private LinearLayout.LayoutParams full(int height) {
+    private LinearLayout vertical() {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        return layout;
+    }
+
+    private LinearLayout horizontal() {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.HORIZONTAL);
+        layout.setGravity(Gravity.CENTER_VERTICAL);
+        return layout;
+    }
+
+    private LinearLayout card() {
+        LinearLayout card = vertical();
+        card.setPadding(dp(16), dp(16), dp(16), dp(16));
+        card.setBackground(rounded(PANEL, 18));
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        params.bottomMargin = dp(14);
+        card.setLayoutParams(params);
+        return card;
+    }
+
+    private Button primaryButton(String label) {
+        Button button = new Button(this);
+        button.setText(label);
+        button.setAllCaps(false);
+        button.setTextColor(Color.WHITE);
+        button.setTextSize(14);
+        button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        button.setBackground(accentDrawable());
+        button.setPadding(dp(16), dp(6), dp(16), dp(6));
+        return button;
+    }
+
+    private Button secondaryButton(String label) {
+        Button button = new Button(this);
+        button.setText(label);
+        button.setAllCaps(false);
+        button.setTextColor(TEXT);
+        button.setTextSize(13);
+        button.setBackground(rounded(PANEL_SOFT, 14));
+        return button;
+    }
+
+    private EditText editor(String hint, int minLines) {
+        EditText input = new EditText(this);
+        input.setHint(hint);
+        input.setHintTextColor(FAINT);
+        input.setTextColor(TEXT);
+        input.setTextSize(14);
+        input.setGravity(Gravity.TOP | Gravity.START);
+        input.setMinLines(minLines);
+        input.setInputType(
+            InputType.TYPE_CLASS_TEXT |
+            InputType.TYPE_TEXT_FLAG_MULTI_LINE |
+            InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+        );
+        input.setPadding(dp(12), dp(10), dp(12), dp(10));
+        input.setBackground(rounded(PANEL_SOFT, 14));
+        return input;
+    }
+
+    private LinearLayout.LayoutParams matchWrap() {
         return new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
-            height
+            ViewGroup.LayoutParams.WRAP_CONTENT
         );
     }
 
-    private LinearLayout.LayoutParams weight() {
+    private LinearLayout.LayoutParams weighted() {
         return new LinearLayout.LayoutParams(
             0,
             ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -125,86 +234,364 @@ public class MainActivity extends Activity {
         );
     }
 
-    private LinearLayout row() {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        return row;
+    private void buildShell() {
+        LinearLayout root = vertical();
+        root.setBackgroundColor(BG);
+
+        LinearLayout header = horizontal();
+        header.setPadding(dp(16), dp(10), dp(10), dp(10));
+
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.drawable.continuity_icon);
+        logo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        LinearLayout.LayoutParams logoParams =
+            new LinearLayout.LayoutParams(dp(42), dp(42));
+        logoParams.rightMargin = dp(10);
+        header.addView(logo, logoParams);
+
+        LinearLayout titles = vertical();
+        TextView appName = heading("Continuity Studio", 16);
+        headerProject = text(project.title, 10, MUTED);
+        headerProject.setSingleLine(true);
+        titles.addView(appName);
+        titles.addView(headerProject);
+        header.addView(titles, weighted());
+
+        ImageView settings = new ImageView(this);
+        settings.setImageResource(R.drawable.ic_settings);
+        settings.setImageTintList(ColorStateList.valueOf(TEXT));
+        settings.setPadding(dp(10), dp(10), dp(10), dp(10));
+        settings.setOnClickListener(v -> showSettings());
+        header.addView(
+            settings,
+            new LinearLayout.LayoutParams(dp(46), dp(46))
+        );
+
+        content = new FrameLayout(this);
+        LinearLayout.LayoutParams contentParams =
+            new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            );
+
+        bottomNav = horizontal();
+        bottomNav.setGravity(Gravity.CENTER);
+        bottomNav.setPadding(dp(6), dp(5), dp(6), dp(7));
+        bottomNav.setBackgroundColor(Color.rgb(10, 13, 25));
+
+        root.addView(
+            header,
+            new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(64)
+            )
+        );
+        root.addView(content, contentParams);
+        root.addView(
+            bottomNav,
+            new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(70)
+            )
+        );
+
+        setContentView(root);
+        refreshBottomNav();
     }
 
-    private LinearLayout card() {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(14), dp(14), dp(14), dp(14));
-        card.setBackgroundColor(Color.rgb(21, 27, 39));
-
-        LinearLayout.LayoutParams params =
-            full(ViewGroup.LayoutParams.WRAP_CONTENT);
-        params.bottomMargin = dp(14);
-        card.setLayoutParams(params);
-        return card;
+    private void refreshBottomNav() {
+        bottomNav.removeAllViews();
+        bottomNav.addView(
+            navItem("Home", R.drawable.ic_home, SCREEN_HOME),
+            weighted()
+        );
+        bottomNav.addView(
+            navItem("Generate", R.drawable.ic_generate, SCREEN_GENERATE),
+            weighted()
+        );
+        bottomNav.addView(
+            navItem("Storyboard", R.drawable.ic_storyboard, SCREEN_STORYBOARD),
+            weighted()
+        );
+        bottomNav.addView(
+            navItem("Export", R.drawable.ic_export, SCREEN_EXPORT),
+            weighted()
+        );
     }
 
-    private TextView label(String value) {
-        TextView label = text(value, 11, Color.rgb(148, 163, 184));
-        label.setPadding(0, dp(10), 0, dp(3));
-        return label;
+    private View navItem(String label, int iconRes, int screen) {
+        LinearLayout item = vertical();
+        item.setGravity(Gravity.CENTER);
+        item.setPadding(dp(4), dp(4), dp(4), dp(2));
+        item.setOnClickListener(v -> showScreen(screen));
+
+        boolean active = currentScreen == screen;
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(iconRes);
+        icon.setImageTintList(
+            ColorStateList.valueOf(active ? ACCENT : MUTED)
+        );
+
+        TextView title = text(label, 10, active ? ACCENT : MUTED);
+        title.setGravity(Gravity.CENTER);
+        title.setPadding(0, dp(3), 0, 0);
+
+        item.addView(
+            icon,
+            new LinearLayout.LayoutParams(dp(24), dp(24))
+        );
+        item.addView(title);
+        return item;
     }
 
-    private void buildUi() {
+    private void showScreen(int screen) {
+        currentScreen = screen;
+        refreshBottomNav();
+        content.removeAllViews();
+
+        project = store.current(DEFAULT_MASTER);
+        headerProject.setText(project.title);
+
+        View view;
+        if (screen == SCREEN_GENERATE) {
+            view = buildGenerateScreen();
+        } else if (screen == SCREEN_STORYBOARD) {
+            view = buildStoryboardScreen();
+        } else if (screen == SCREEN_EXPORT) {
+            view = buildExportScreen();
+        } else {
+            view = buildHomeScreen();
+        }
+
+        content.addView(view);
+    }
+
+    private ScrollView scrollScreen() {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
-        scroll.setBackgroundColor(Color.rgb(13, 17, 26));
+        scroll.setBackgroundColor(BG);
+        return scroll;
+    }
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(18), dp(22), dp(18), dp(34));
+    private LinearLayout screenBody() {
+        LinearLayout body = vertical();
+        body.setPadding(dp(16), dp(10), dp(16), dp(28));
+        return body;
+    }
 
-        TextView title = text(
-            "Continuity Studio",
-            27,
-            Color.rgb(248, 250, 252)
-        );
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-        root.addView(title);
+    private View buildHomeScreen() {
+        ScrollView scroll = scrollScreen();
+        LinearLayout body = screenBody();
 
-        TextView subtitle = text(
-            "Standalone · The Rise preset · no PC required",
+        LinearLayout hero = card();
+        hero.setBackgroundResource(R.drawable.bg_card_selected);
+
+        LinearLayout heroTop = horizontal();
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(R.drawable.continuity_icon);
+        icon.setScaleType(ImageView.ScaleType.CENTER_CROP);
+
+        LinearLayout heroCopy = vertical();
+        TextView eyebrow = text("CONTINUITY-FIRST CREATION", 10, Color.rgb(206, 181, 255));
+        eyebrow.setLetterSpacing(0.12f);
+        TextView heroTitle = heading("Turn ideas into\nvisual stories", 25);
+        heroTitle.setPadding(0, dp(5), 0, dp(4));
+        TextView heroSub = text(
+            "Script · Generate · Storyboard · Voiceover · Subtitles · Export",
             12,
-            Color.rgb(167, 139, 250)
+            MUTED
         );
-        subtitle.setPadding(0, dp(4), 0, dp(18));
-        root.addView(subtitle);
 
-        LinearLayout sceneCard = card();
-        sceneCard.addView(text("Scene", 17, Color.WHITE));
+        heroCopy.addView(eyebrow);
+        heroCopy.addView(heroTitle);
+        heroCopy.addView(heroSub);
 
-        TextView helper = text(
-            "Only paste the narration / scene idea. Model, format, style and continuity rules are already filled.",
+        LinearLayout.LayoutParams iconParams =
+            new LinearLayout.LayoutParams(dp(76), dp(76));
+        iconParams.rightMargin = dp(14);
+        heroTop.addView(icon, iconParams);
+        heroTop.addView(heroCopy, weighted());
+        hero.addView(heroTop);
+
+        Button newProject = primaryButton("+  New Project");
+        LinearLayout.LayoutParams newParams = matchWrap();
+        newParams.topMargin = dp(14);
+        newProject.setLayoutParams(newParams);
+        newProject.setOnClickListener(v -> showNewProjectDialog());
+        hero.addView(newProject);
+
+        body.addView(hero);
+
+        LinearLayout projectCard = card();
+        projectCard.addView(text("CURRENT PROJECT", 10, MUTED));
+        TextView projectTitle = heading(project.title, 20);
+        projectTitle.setPadding(0, dp(5), 0, dp(6));
+        projectCard.addView(projectTitle);
+
+        TextView stats = text(
+            project.scenes.size() + " scenes · " +
+            project.renderedSceneCount() + " rendered · " +
+            durationLabel(project.totalDurationMs()),
             12,
-            Color.rgb(148, 163, 184)
+            MUTED
         );
-        helper.setPadding(0, dp(4), 0, dp(9));
-        sceneCard.addView(helper);
+        projectCard.addView(stats);
 
-        sceneInput = new EditText(this);
-        sceneInput.setHint(
-            "Example: Before GeForce and RTX, NVIDIA had the NV1. Released in 1995..."
-        );
-        sceneInput.setTextColor(Color.WHITE);
-        sceneInput.setHintTextColor(Color.rgb(100, 116, 139));
-        sceneInput.setGravity(Gravity.TOP);
-        sceneInput.setMinLines(5);
-        sceneInput.setInputType(
-            InputType.TYPE_CLASS_TEXT |
-            InputType.TYPE_TEXT_FLAG_MULTI_LINE |
-            InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-        );
-        sceneCard.addView(sceneInput, full(dp(145)));
+        LinearLayout openRow = horizontal();
+        openRow.setPadding(0, dp(12), 0, 0);
 
-        sceneCard.addView(label("Model · already selected"));
-        modelSpinner = new Spinner(this);
-        modelSpinner.setAdapter(
+        Button script = secondaryButton("Import Script");
+        script.setOnClickListener(v -> showScriptImportDialog());
+        Button storyboard = secondaryButton("Open Storyboard");
+        storyboard.setOnClickListener(v -> showScreen(SCREEN_STORYBOARD));
+
+        LinearLayout.LayoutParams left = weighted();
+        left.rightMargin = dp(8);
+        openRow.addView(script, left);
+        openRow.addView(storyboard, weighted());
+        projectCard.addView(openRow);
+
+        body.addView(projectCard);
+
+        TextView quick = heading("Quick actions", 17);
+        quick.setPadding(0, dp(4), 0, dp(10));
+        body.addView(quick);
+
+        LinearLayout quickRow1 = horizontal();
+        quickRow1.addView(
+            actionTile(
+                "Generate Image",
+                "Nano Banana",
+                R.drawable.ic_generate,
+                () -> {
+                    activeSceneId = null;
+                    showScreen(SCREEN_GENERATE);
+                }
+            ),
+            tileParams(true)
+        );
+        quickRow1.addView(
+            actionTile(
+                "Storyboard",
+                project.scenes.size() + " scenes",
+                R.drawable.ic_storyboard,
+                () -> showScreen(SCREEN_STORYBOARD)
+            ),
+            tileParams(false)
+        );
+        body.addView(quickRow1);
+
+        LinearLayout quickRow2 = horizontal();
+        quickRow2.setPadding(0, dp(10), 0, 0);
+        quickRow2.addView(
+            actionTile(
+                "Export Video",
+                "MP4 + subtitles",
+                R.drawable.ic_export,
+                () -> showScreen(SCREEN_EXPORT)
+            ),
+            tileParams(true)
+        );
+        quickRow2.addView(
+            actionTile(
+                "References",
+                project.references.size() + " saved",
+                R.drawable.ic_generate,
+                this::pickReferences
+            ),
+            tileParams(false)
+        );
+        body.addView(quickRow2);
+
+        List<ProjectStore.Project> projects = store.all();
+        TextView recent = heading("Projects", 17);
+        recent.setPadding(0, dp(22), 0, dp(10));
+        body.addView(recent);
+
+        for (ProjectStore.Project item : projects) {
+            LinearLayout p = card();
+            if (item.id.equals(project.id)) {
+                p.setBackgroundResource(R.drawable.bg_card_selected);
+            }
+
+            TextView title = heading(item.title, 15);
+            TextView meta = text(
+                item.scenes.size() + " scenes · " +
+                item.renderedSceneCount() + " rendered",
+                11,
+                MUTED
+            );
+            meta.setPadding(0, dp(3), 0, 0);
+            p.addView(title);
+            p.addView(meta);
+            p.setOnClickListener(v -> {
+                store.setCurrent(item.id);
+                project = store.current(DEFAULT_MASTER);
+                activeSceneId = null;
+                showScreen(SCREEN_HOME);
+            });
+            body.addView(p);
+        }
+
+        scroll.addView(body);
+        return scroll;
+    }
+
+    private LinearLayout.LayoutParams tileParams(boolean left) {
+        LinearLayout.LayoutParams params = weighted();
+        if (left) params.rightMargin = dp(8);
+        return params;
+    }
+
+    private View actionTile(
+        String title,
+        String subtitle,
+        int iconRes,
+        Runnable action
+    ) {
+        LinearLayout tile = vertical();
+        tile.setPadding(dp(14), dp(14), dp(14), dp(14));
+        tile.setBackground(rounded(PANEL, 16));
+        tile.setOnClickListener(v -> action.run());
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(iconRes);
+        icon.setImageTintList(ColorStateList.valueOf(ACCENT));
+        tile.addView(
+            icon,
+            new LinearLayout.LayoutParams(dp(26), dp(26))
+        );
+
+        TextView t = heading(title, 13);
+        t.setPadding(0, dp(8), 0, dp(2));
+        tile.addView(t);
+        tile.addView(text(subtitle, 10, MUTED));
+        return tile;
+    }
+
+    private View buildGenerateScreen() {
+        ScrollView scroll = scrollScreen();
+        LinearLayout body = screenBody();
+
+        body.addView(heading("AI Image Generation", 24));
+        TextView lead = text(
+            activeSceneId == null
+                ? "Create a new continuity-locked visual."
+                : "Regenerate this storyboard scene without losing the rest of the project.",
+            12,
+            MUTED
+        );
+        lead.setPadding(0, dp(4), 0, dp(14));
+        body.addView(lead);
+
+        ProjectStore.Scene active = findScene(activeSceneId);
+
+        LinearLayout modelCard = card();
+        modelCard.addView(text("MODEL", 10, MUTED));
+
+        generateModel = new Spinner(this);
+        generateModel.setAdapter(
             new ArrayAdapter<>(
                 this,
                 android.R.layout.simple_spinner_dropdown_item,
@@ -215,177 +602,818 @@ public class MainActivity extends Activity {
                 }
             )
         );
-        sceneCard.addView(modelSpinner, full(dp(52)));
+        selectSpinner(generateModel, project.model);
+        modelCard.addView(generateModel, matchWrap());
 
-        sceneCard.addView(label("Format · already selected"));
-        aspectSpinner = new Spinner(this);
-        aspectSpinner.setAdapter(
+        modelCard.addView(text("FORMAT", 10, MUTED));
+        generateAspect = new Spinner(this);
+        generateAspect.setAdapter(
             new ArrayAdapter<>(
                 this,
                 android.R.layout.simple_spinner_dropdown_item,
                 new String[] { "16:9", "9:16", "1:1", "4:3", "3:4" }
             )
         );
-        sceneCard.addView(aspectSpinner, full(dp(52)));
+        selectSpinner(generateAspect, project.aspectRatio);
+        modelCard.addView(generateAspect, matchWrap());
+        body.addView(modelCard);
 
-        LinearLayout refRow = row();
-        Button refs = button("Add references (optional)");
-        refs.setOnClickListener(v -> pickReferences());
-        Button clearRefs = button("Clear refs");
-        clearRefs.setOnClickListener(v -> {
-            referenceUris.clear();
-            refreshReferenceStatus();
-        });
-        refRow.addView(refs, weight());
-        refRow.addView(clearRefs, weight());
-        sceneCard.addView(refRow);
-
-        referenceStatus = text(
-            "No references · okay to generate",
-            12,
-            Color.rgb(148, 163, 184)
+        LinearLayout promptCard = card();
+        promptCard.addView(text("SCENE NARRATION", 10, MUTED));
+        generateNarration = editor(
+            "Example: Before GeForce and RTX, NVIDIA had the NV1. Released in 1995...",
+            5
         );
-        referenceStatus.setPadding(0, dp(6), 0, dp(8));
-        sceneCard.addView(referenceStatus);
-
-        generateButton = button("Generate image");
-        generateButton.setOnClickListener(v -> generate());
-        sceneCard.addView(generateButton, full(dp(56)));
-
-        progress = new ProgressBar(this);
-        progress.setIndeterminate(true);
-        progress.setVisibility(View.GONE);
-        sceneCard.addView(progress);
-
-        status = text(
-            "Ready · output auto-saves to Downloads",
-            12,
-            Color.rgb(148, 163, 184)
-        );
-        status.setPadding(0, dp(7), 0, 0);
-        sceneCard.addView(status);
-        root.addView(sceneCard);
-
-        LinearLayout output = card();
-        output.addView(text("Latest result", 17, Color.WHITE));
-
-        preview = new ImageView(this);
-        preview.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        preview.setBackgroundColor(Color.BLACK);
-        LinearLayout.LayoutParams previewParams = full(dp(320));
-        previewParams.topMargin = dp(10);
-        output.addView(preview, previewParams);
-        root.addView(output);
-
-        LinearLayout setup = card();
-        setup.addView(text("One-time setup", 17, Color.WHITE));
-
-        keyStatus = text("", 12, Color.rgb(148, 163, 184));
-        keyStatus.setPadding(0, dp(4), 0, dp(8));
-        setup.addView(keyStatus);
-
-        LinearLayout keyRow = row();
-        Button setKey = button("Gemini API key");
-        setKey.setOnClickListener(v -> showApiKeyDialog());
-        Button getKey = button("Get key");
-        getKey.setOnClickListener(v ->
-            openExternal("https://aistudio.google.com/app/apikey")
-        );
-        Button advanced = button("Advanced");
-        advanced.setOnClickListener(v -> showMasterPromptDialog());
-
-        keyRow.addView(setKey, weight());
-        keyRow.addView(getKey, weight());
-        keyRow.addView(advanced, weight());
-        setup.addView(keyRow);
-
-        TextView note = text(
-            "Enter the API key once. It is encrypted with Android Keystore and reused automatically.",
-            11,
-            Color.rgb(100, 116, 139)
-        );
-        note.setPadding(0, dp(8), 0, 0);
-        setup.addView(note);
-        root.addView(setup);
-
-        LinearLayout desktopCard = card();
-        desktopCard.addView(
-            text("Optional desktop companion", 17, Color.WHITE)
-        );
-        TextView desktopCopy = text(
-            "Standalone image generation does not need your PC. Open this only if you want to control the desktop app later.",
-            12,
-            Color.rgb(148, 163, 184)
-        );
-        desktopCopy.setPadding(0, dp(4), 0, dp(8));
-        desktopCard.addView(desktopCopy);
-
-        Button desktop = button("Desktop companion");
-        desktop.setOnClickListener(v ->
-            startActivity(
-                new Intent(this, DesktopCompanionActivity.class)
+        if (active != null) generateNarration.setText(active.narration);
+        promptCard.addView(
+            generateNarration,
+            new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(150)
             )
         );
-        desktopCard.addView(desktop, full(dp(52)));
-        root.addView(desktopCard);
 
-        scroll.addView(root);
-        setContentView(scroll);
+        referenceStatus = text("", 11, MUTED);
+        refreshReferenceStatus();
+        referenceStatus.setPadding(0, dp(10), 0, dp(8));
+        promptCard.addView(referenceStatus);
+
+        LinearLayout refRow = horizontal();
+        Button addRef = secondaryButton("＋ Add References");
+        addRef.setOnClickListener(v -> pickReferences());
+        Button clearRef = secondaryButton("Clear");
+        clearRef.setOnClickListener(v -> {
+            project.references.clear();
+            store.save(project);
+            refreshReferenceStatus();
+        });
+        LinearLayout.LayoutParams refLeft = weighted();
+        refLeft.rightMargin = dp(8);
+        refRow.addView(addRef, refLeft);
+        refRow.addView(clearRef, weighted());
+        promptCard.addView(refRow);
+
+        generateButton = primaryButton(
+            active == null ? "✦  Generate Scene" : "✦  Regenerate Scene"
+        );
+        LinearLayout.LayoutParams genParams = matchWrap();
+        genParams.topMargin = dp(12);
+        generateButton.setLayoutParams(genParams);
+        generateButton.setOnClickListener(v -> generateImage());
+        promptCard.addView(generateButton);
+
+        generateProgress = new ProgressBar(this);
+        generateProgress.setIndeterminate(true);
+        generateProgress.setVisibility(View.GONE);
+        promptCard.addView(generateProgress);
+
+        generateStatus = text(
+            apiKeyStore.hasKey()
+                ? "Ready · output auto-saves to Downloads"
+                : "Add your Gemini API key once in Settings before generating.",
+            11,
+            apiKeyStore.hasKey() ? SUCCESS : Color.rgb(251, 191, 36)
+        );
+        generateStatus.setPadding(0, dp(8), 0, 0);
+        promptCard.addView(generateStatus);
+
+        body.addView(promptCard);
+
+        LinearLayout previewCard = card();
+        previewCard.addView(heading("Preview", 17));
+
+        generatePreview = new ImageView(this);
+        generatePreview.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        generatePreview.setBackgroundColor(Color.BLACK);
+        LinearLayout.LayoutParams previewParams =
+            new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(300)
+            );
+        previewParams.topMargin = dp(10);
+        previewCard.addView(generatePreview, previewParams);
+
+        if (active != null && active.imagePath != null && !active.imagePath.isEmpty()) {
+            Bitmap bitmap = BitmapFactory.decodeFile(active.imagePath);
+            if (bitmap != null) generatePreview.setImageBitmap(bitmap);
+        }
+
+        body.addView(previewCard);
+
+        scroll.addView(body);
+        return scroll;
     }
 
-    private void restoreDefaults() {
-        sceneInput.setText(preferences.getString(PREF_SCENE, ""));
-        selectSpinner(
-            modelSpinner,
-            preferences.getString(PREF_MODEL, "Nano Banana 2")
-        );
-        selectSpinner(
-            aspectSpinner,
-            preferences.getString(PREF_ASPECT, "16:9")
-        );
-    }
+    private View buildStoryboardScreen() {
+        ScrollView scroll = scrollScreen();
+        LinearLayout body = screenBody();
 
-    private void selectSpinner(Spinner spinner, String value) {
-        for (int i = 0; i < spinner.getCount(); i++) {
-            if (value.equals(spinner.getItemAtPosition(i).toString())) {
-                spinner.setSelection(i);
-                return;
+        LinearLayout titleRow = horizontal();
+        LinearLayout copy = vertical();
+        copy.addView(heading("Storyboard", 24));
+        copy.addView(
+            text(
+                project.scenes.size() + " scenes · " +
+                project.renderedSceneCount() + " rendered",
+                11,
+                MUTED
+            )
+        );
+        titleRow.addView(copy, weighted());
+
+        Button add = primaryButton("＋ Scene");
+        add.setOnClickListener(v -> {
+            activeSceneId = null;
+            showScreen(SCREEN_GENERATE);
+        });
+        titleRow.addView(add);
+        body.addView(titleRow);
+
+        if (project.scenes.isEmpty()) {
+            LinearLayout empty = card();
+            TextView e = heading("Your storyboard is empty", 17);
+            TextView d = text(
+                "Import a script from Home or generate your first visual.",
+                12,
+                MUTED
+            );
+            d.setPadding(0, dp(5), 0, dp(12));
+            empty.addView(e);
+            empty.addView(d);
+            Button go = primaryButton("Generate first scene");
+            go.setOnClickListener(v -> showScreen(SCREEN_GENERATE));
+            empty.addView(go);
+            body.addView(empty);
+        }
+
+        for (int i = 0; i < project.scenes.size(); i++) {
+            ProjectStore.Scene scene = project.scenes.get(i);
+            LinearLayout sceneCard = card();
+
+            LinearLayout row = horizontal();
+
+            ImageView thumb = new ImageView(this);
+            thumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            thumb.setBackgroundColor(Color.rgb(10, 13, 25));
+            if (scene.imagePath != null && !scene.imagePath.isEmpty()) {
+                Bitmap bitmap = BitmapFactory.decodeFile(scene.imagePath);
+                if (bitmap != null) thumb.setImageBitmap(bitmap);
             }
+
+            LinearLayout.LayoutParams thumbParams =
+                new LinearLayout.LayoutParams(dp(110), dp(82));
+            thumbParams.rightMargin = dp(12);
+            row.addView(thumb, thumbParams);
+
+            LinearLayout meta = vertical();
+            TextView number = text(
+                "SCENE " + String.format(Locale.US, "%02d", i + 1),
+                9,
+                ACCENT
+            );
+            number.setLetterSpacing(0.1f);
+            meta.addView(number);
+
+            String shortText =
+                scene.narration == null || scene.narration.trim().isEmpty()
+                    ? "Untitled scene"
+                    : scene.narration.trim();
+            if (shortText.length() > 95) {
+                shortText = shortText.substring(0, 92) + "…";
+            }
+
+            TextView narration = heading(shortText, 13);
+            narration.setMaxLines(3);
+            narration.setPadding(0, dp(4), 0, dp(4));
+            meta.addView(narration);
+
+            meta.addView(
+                text(
+                    String.format(
+                        Locale.US,
+                        "%.1fs · %s",
+                        scene.durationMs / 1000d,
+                        scene.locked ? "Locked" : "Editable"
+                    ),
+                    10,
+                    MUTED
+                )
+            );
+            row.addView(meta, weighted());
+            sceneCard.addView(row);
+
+            LinearLayout actions = horizontal();
+            actions.setPadding(0, dp(10), 0, 0);
+
+            Button regenerate = secondaryButton(
+                scene.imagePath == null || scene.imagePath.isEmpty()
+                    ? "Generate"
+                    : "Regenerate"
+            );
+            regenerate.setOnClickListener(v -> {
+                if (scene.locked) {
+                    toast("Unlock this scene before regenerating.");
+                    return;
+                }
+                activeSceneId = scene.id;
+                showScreen(SCREEN_GENERATE);
+            });
+
+            Button edit = secondaryButton("Edit");
+            edit.setOnClickListener(v -> showSceneEditor(scene));
+
+            Button lock = secondaryButton(scene.locked ? "Unlock" : "Lock");
+            lock.setOnClickListener(v -> {
+                scene.locked = !scene.locked;
+                store.save(project);
+                showScreen(SCREEN_STORYBOARD);
+            });
+
+            LinearLayout.LayoutParams a = weighted();
+            a.rightMargin = dp(6);
+            actions.addView(regenerate, a);
+            LinearLayout.LayoutParams b = weighted();
+            b.rightMargin = dp(6);
+            actions.addView(edit, b);
+            actions.addView(lock, weighted());
+            sceneCard.addView(actions);
+
+            LinearLayout secondActions = horizontal();
+            secondActions.setPadding(0, dp(7), 0, 0);
+
+            Button ownImage = secondaryButton("Use own image");
+            ownImage.setOnClickListener(v -> {
+                if (scene.locked) {
+                    toast("Unlock this scene before replacing its image.");
+                    return;
+                }
+                pendingSceneImageId = scene.id;
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent.setType("image/*");
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                startActivityForResult(intent, PICK_SCENE_IMAGE);
+            });
+
+            Button remove = secondaryButton("Delete");
+            remove.setTextColor(DANGER);
+            remove.setOnClickListener(v -> confirmDeleteScene(scene));
+
+            LinearLayout.LayoutParams ownParams = weighted();
+            ownParams.rightMargin = dp(6);
+            secondActions.addView(ownImage, ownParams);
+            secondActions.addView(remove, weighted());
+            sceneCard.addView(secondActions);
+
+            body.addView(sceneCard);
+        }
+
+        scroll.addView(body);
+        return scroll;
+    }
+
+    private View buildExportScreen() {
+        ScrollView scroll = scrollScreen();
+        LinearLayout body = screenBody();
+
+        body.addView(heading("Review & Export", 24));
+        TextView lead = text(
+            "Render your storyboard locally on the S23. No PC required.",
+            12,
+            MUTED
+        );
+        lead.setPadding(0, dp(4), 0, dp(14));
+        body.addView(lead);
+
+        if (project.lastExportPath != null &&
+            !project.lastExportPath.isEmpty() &&
+            new File(project.lastExportPath).exists()) {
+            LinearLayout playerCard = card();
+            playerCard.addView(heading("Latest video", 17));
+
+            VideoView video = new VideoView(this);
+            video.setVideoPath(project.lastExportPath);
+            MediaController controller = new MediaController(this);
+            controller.setAnchorView(video);
+            video.setMediaController(controller);
+
+            LinearLayout.LayoutParams videoParams =
+                new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(240)
+                );
+            videoParams.topMargin = dp(10);
+            playerCard.addView(video, videoParams);
+            body.addView(playerCard);
+        }
+
+        LinearLayout summary = card();
+        summary.addView(text("PROJECT", 10, MUTED));
+        TextView title = heading(project.title, 19);
+        title.setPadding(0, dp(4), 0, dp(6));
+        summary.addView(title);
+        summary.addView(
+            text(
+                project.renderedSceneCount() + "/" +
+                project.scenes.size() + " scenes rendered · " +
+                durationLabel(project.totalDurationMs()),
+                12,
+                MUTED
+            )
+        );
+        body.addView(summary);
+
+        LinearLayout audio = card();
+        audio.addView(heading("Voiceover & subtitles", 17));
+
+        TextView voice = text(
+            project.voiceoverPath == null || project.voiceoverPath.isEmpty()
+                ? "No voiceover selected"
+                : new File(project.voiceoverPath).getName(),
+            11,
+            MUTED
+        );
+        voice.setPadding(0, dp(5), 0, dp(8));
+        audio.addView(voice);
+
+        Button chooseVoice = secondaryButton("Choose Voiceover");
+        chooseVoice.setOnClickListener(v -> pickVoiceover());
+        audio.addView(chooseVoice);
+
+        Switch subtitles = new Switch(this);
+        subtitles.setText("Burn subtitles into video");
+        subtitles.setTextColor(TEXT);
+        subtitles.setChecked(project.subtitlesEnabled);
+        subtitles.setPadding(0, dp(8), 0, 0);
+        subtitles.setOnCheckedChangeListener((button, checked) -> {
+            project.subtitlesEnabled = checked;
+            store.save(project);
+        });
+        audio.addView(subtitles);
+
+        Button saveSrt = secondaryButton("Save SRT to Downloads");
+        LinearLayout.LayoutParams srtParams = matchWrap();
+        srtParams.topMargin = dp(8);
+        saveSrt.setLayoutParams(srtParams);
+        saveSrt.setOnClickListener(v -> saveSrt());
+        audio.addView(saveSrt);
+        body.addView(audio);
+
+        LinearLayout settings = card();
+        settings.addView(heading("Export settings", 17));
+        settings.addView(text("Resolution", 10, MUTED));
+
+        qualitySpinner = new Spinner(this);
+        qualitySpinner.setAdapter(
+            new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_dropdown_item,
+                new String[] { "1080p", "720p" }
+            )
+        );
+        settings.addView(qualitySpinner, matchWrap());
+
+        Button export = primaryButton("Export MP4");
+        LinearLayout.LayoutParams exportParams = matchWrap();
+        exportParams.topMargin = dp(12);
+        export.setLayoutParams(exportParams);
+        export.setOnClickListener(v -> renderVideo());
+        settings.addView(export);
+
+        exportProgress = new ProgressBar(this);
+        exportProgress.setIndeterminate(true);
+        exportProgress.setVisibility(View.GONE);
+        settings.addView(exportProgress);
+
+        exportStatus = text(
+            "Exports save to Downloads/Continuity Studio/Exports",
+            11,
+            MUTED
+        );
+        exportStatus.setPadding(0, dp(8), 0, 0);
+        settings.addView(exportStatus);
+        body.addView(settings);
+
+        scroll.addView(body);
+        return scroll;
+    }
+
+    private void generateImage() {
+        String narration = generateNarration.getText().toString().trim();
+        if (narration.isEmpty()) {
+            generateNarration.setError("Paste narration or a scene idea.");
+            return;
+        }
+
+        final String apiKey;
+        try {
+            apiKey = apiKeyStore.get();
+        } catch (Exception error) {
+            generateStatus.setText("Could not read your saved API key.");
+            return;
+        }
+
+        if (apiKey.isEmpty()) {
+            showApiKeyDialog();
+            return;
+        }
+
+        ProjectStore.Scene scene = findScene(activeSceneId);
+        if (scene != null && scene.locked) {
+            toast("Unlock this scene first.");
+            return;
+        }
+
+        project.model = generateModel.getSelectedItem().toString();
+        project.aspectRatio = generateAspect.getSelectedItem().toString();
+
+        if (scene == null) {
+            scene = new ProjectStore.Scene();
+            project.scenes.add(scene);
+            activeSceneId = scene.id;
+        }
+
+        scene.narration = narration;
+        if (scene.subtitle == null || scene.subtitle.trim().isEmpty()) {
+            scene.subtitle = narration;
+        }
+        store.save(project);
+
+        ProjectStore.Scene target = scene;
+        String prompt = compilePrompt(narration);
+
+        generateButton.setEnabled(false);
+        generateProgress.setVisibility(View.VISIBLE);
+        generateStatus.setText("Generating with " + project.model + "…");
+        generateStatus.setTextColor(MUTED);
+
+        executor.execute(() -> {
+            try {
+                List<GeminiImageClient.ReferenceImage> refs =
+                    loadReferenceImages();
+
+                GeminiImageClient.Result result =
+                    new GeminiImageClient().generate(
+                        apiKey,
+                        project.model,
+                        prompt,
+                        project.aspectRatio,
+                        refs
+                    );
+
+                MediaFiles.SavedMedia saved =
+                    MediaFiles.saveGeneratedImage(
+                        this,
+                        project.id,
+                        result.bytes,
+                        result.mimeType
+                    );
+
+                target.imagePath = saved.internalPath;
+                store.save(project);
+
+                Bitmap bitmap = BitmapFactory.decodeByteArray(
+                    result.bytes,
+                    0,
+                    result.bytes.length
+                );
+
+                mainHandler.post(() -> {
+                    generatePreview.setImageBitmap(bitmap);
+                    generateProgress.setVisibility(View.GONE);
+                    generateButton.setEnabled(true);
+                    generateStatus.setTextColor(SUCCESS);
+                    generateStatus.setText(
+                        "Generated · saved to " + saved.publicLocation
+                    );
+                    headerProject.setText(project.title);
+                });
+            } catch (Exception error) {
+                mainHandler.post(() -> {
+                    generateProgress.setVisibility(View.GONE);
+                    generateButton.setEnabled(true);
+                    generateStatus.setTextColor(DANGER);
+                    generateStatus.setText(
+                        "Generation failed: " +
+                        safeMessage(error, "Unknown generation error.")
+                    );
+                });
+            }
+        });
+    }
+
+    private String compilePrompt(String narration) {
+        return project.masterPrompt +
+            "\n\nSCENE NARRATION / FACTUAL INTENT:\n" +
+            narration +
+            "\n\nCOMPOSITION RULES:\n" +
+            "Represent the narration literally and clearly. Favor one strong focal subject. " +
+            "Do not add explanatory on-image text. If the scene names a real product, device, company, person, era, or environment, make that exact subject recognizable and historically grounded.";
+    }
+
+    private List<GeminiImageClient.ReferenceImage>
+    loadReferenceImages() throws Exception {
+        ArrayList<GeminiImageClient.ReferenceImage> output =
+            new ArrayList<>();
+
+        int count = Math.min(8, project.references.size());
+        for (int i = 0; i < count; i++) {
+            File file = new File(project.references.get(i));
+            if (!file.exists()) continue;
+
+            try (
+                FileInputStream input = new FileInputStream(file);
+                ByteArrayOutputStream bytes = new ByteArrayOutputStream()
+            ) {
+                byte[] buffer = new byte[16 * 1024];
+                int read;
+                int total = 0;
+
+                while ((read = input.read(buffer)) >= 0) {
+                    total += read;
+                    if (total > 12 * 1024 * 1024) {
+                        throw new Exception(
+                            "A reference image is over 12 MB."
+                        );
+                    }
+                    bytes.write(buffer, 0, read);
+                }
+
+                output.add(
+                    new GeminiImageClient.ReferenceImage(
+                        bytes.toByteArray(),
+                        mimeForPath(file.getName())
+                    )
+                );
+            }
+        }
+
+        return output;
+    }
+
+    private void pickReferences() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.setType("image/*");
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        startActivityForResult(intent, PICK_REFERENCES);
+    }
+
+    private void pickVoiceover() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.setType("audio/*");
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        startActivityForResult(intent, PICK_VOICEOVER);
+    }
+
+    private void renderVideo() {
+        if (project.renderedSceneCount() == 0) {
+            toast("Generate at least one storyboard image first.");
+            return;
+        }
+
+        exportProgress.setVisibility(View.VISIBLE);
+        exportStatus.setTextColor(MUTED);
+        exportStatus.setText("Rendering on your S23…");
+
+        String quality =
+            qualitySpinner == null
+                ? "1080p"
+                : qualitySpinner.getSelectedItem().toString();
+
+        VideoRenderer.render(
+            this,
+            project,
+            quality,
+            new VideoRenderer.Callback() {
+                @Override
+                public void onSuccess(
+                    String publicLocation,
+                    String internalPath
+                ) {
+                    mainHandler.post(() -> {
+                        project.lastExportPath = internalPath;
+                        store.save(project);
+                        exportProgress.setVisibility(View.GONE);
+                        exportStatus.setTextColor(SUCCESS);
+                        exportStatus.setText(
+                            "Ready · " + publicLocation
+                        );
+                        toast("Video exported to Downloads.");
+                        showScreen(SCREEN_EXPORT);
+                    });
+                }
+
+                @Override
+                public void onError(String message) {
+                    mainHandler.post(() -> {
+                        exportProgress.setVisibility(View.GONE);
+                        exportStatus.setTextColor(DANGER);
+                        exportStatus.setText(
+                            "Export failed: " + message
+                        );
+                    });
+                }
+            }
+        );
+    }
+
+    private void saveSrt() {
+        try {
+            String location = MediaFiles.publishText(
+                this,
+                VideoRenderer.buildSrt(project),
+                "application/x-subrip",
+                "Continuity Studio/Exports",
+                sanitizeFile(project.title) + ".srt"
+            );
+            toast("Saved " + location);
+        } catch (Exception error) {
+            toast("Could not save SRT: " + safeMessage(error, "Unknown error"));
         }
     }
 
-    private void saveDraft() {
-        preferences.edit()
-            .putString(PREF_SCENE, sceneInput.getText().toString())
-            .putString(
-                PREF_MODEL,
-                modelSpinner.getSelectedItem().toString()
+    private void showNewProjectDialog() {
+        EditText input = new EditText(this);
+        input.setHint("Project title");
+        input.setSingleLine(true);
+
+        new AlertDialog.Builder(this)
+            .setTitle("New project")
+            .setMessage(
+                "Your continuity defaults are already filled. Just name the project."
             )
-            .putString(
-                PREF_ASPECT,
-                aspectSpinner.getSelectedItem().toString()
-            )
-            .putString(PREF_MASTER, masterPrompt)
-            .apply();
+            .setView(input)
+            .setPositiveButton("Create", (dialog, which) -> {
+                project = store.create(
+                    input.getText().toString(),
+                    DEFAULT_MASTER
+                );
+                activeSceneId = null;
+                showScreen(SCREEN_HOME);
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
     }
 
-    private void refreshKeyStatus() {
-        keyStatus.setText(
+    private void showScriptImportDialog() {
+        EditText input = editor(
+            "Paste the full narration/script here. It will be split into editable storyboard scenes.",
+            12
+        );
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle("Import script")
+            .setView(input)
+            .setPositiveButton("Create scenes", null)
+            .setNeutralButton("Replace scenes", null)
+            .setNegativeButton("Cancel", null)
+            .create();
+
+        dialog.setOnShowListener(ignored -> {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(v -> {
+                    ArrayList<ProjectStore.Scene> scenes =
+                        ProjectStore.splitScript(
+                            input.getText().toString()
+                        );
+                    if (scenes.isEmpty()) {
+                        input.setError("Paste a script first.");
+                        return;
+                    }
+                    project.scenes.addAll(scenes);
+                    store.save(project);
+                    dialog.dismiss();
+                    showScreen(SCREEN_STORYBOARD);
+                });
+
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL)
+                .setOnClickListener(v -> {
+                    ArrayList<ProjectStore.Scene> scenes =
+                        ProjectStore.splitScript(
+                            input.getText().toString()
+                        );
+                    if (scenes.isEmpty()) {
+                        input.setError("Paste a script first.");
+                        return;
+                    }
+                    project.scenes.clear();
+                    project.scenes.addAll(scenes);
+                    store.save(project);
+                    dialog.dismiss();
+                    showScreen(SCREEN_STORYBOARD);
+                });
+        });
+
+        dialog.show();
+    }
+
+    private void showSceneEditor(ProjectStore.Scene scene) {
+        LinearLayout layout = vertical();
+        layout.setPadding(dp(18), 0, dp(18), 0);
+
+        EditText narration = editor("Narration", 5);
+        narration.setText(scene.narration);
+
+        EditText subtitle = editor("Subtitle text", 3);
+        subtitle.setText(scene.subtitle);
+
+        EditText duration = new EditText(this);
+        duration.setHint("Duration seconds");
+        duration.setSingleLine(true);
+        duration.setInputType(
+            InputType.TYPE_CLASS_NUMBER |
+            InputType.TYPE_NUMBER_FLAG_DECIMAL
+        );
+        duration.setText(
+            String.format(Locale.US, "%.1f", scene.durationMs / 1000d)
+        );
+
+        layout.addView(text("Narration", 10, MUTED));
+        layout.addView(narration);
+        layout.addView(text("Subtitle", 10, MUTED));
+        layout.addView(subtitle);
+        layout.addView(text("Duration", 10, MUTED));
+        layout.addView(duration);
+
+        new AlertDialog.Builder(this)
+            .setTitle("Edit scene")
+            .setView(layout)
+            .setPositiveButton("Save", (dialog, which) -> {
+                scene.narration =
+                    narration.getText().toString().trim();
+                scene.subtitle =
+                    subtitle.getText().toString().trim();
+
+                try {
+                    double seconds = Double.parseDouble(
+                        duration.getText().toString().trim()
+                    );
+                    scene.durationMs = Math.max(
+                        500,
+                        Math.round(seconds * 1000d)
+                    );
+                } catch (Exception ignored) {
+                }
+
+                store.save(project);
+                showScreen(SCREEN_STORYBOARD);
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    private void confirmDeleteScene(ProjectStore.Scene scene) {
+        new AlertDialog.Builder(this)
+            .setTitle("Delete scene?")
+            .setMessage(
+                "This removes the scene from this project. Exported files in Downloads are not touched."
+            )
+            .setPositiveButton("Delete", (dialog, which) -> {
+                project.scenes.remove(scene);
+                store.save(project);
+                if (scene.id.equals(activeSceneId)) activeSceneId = null;
+                showScreen(SCREEN_STORYBOARD);
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    private void showSettings() {
+        String[] options = {
             apiKeyStore.hasKey()
-                ? "API key saved securely · no need to enter it again"
-                : "API key needed once before first generation"
-        );
-    }
+                ? "Replace Gemini API key"
+                : "Add Gemini API key",
+            "Master continuity prompt",
+            "Rename current project",
+            "Clear Gemini API key",
+            "Desktop companion"
+        };
 
-    private void refreshReferenceStatus() {
-        referenceStatus.setText(
-            referenceUris.isEmpty()
-                ? "No references · okay to generate"
-                : referenceUris.size() +
-                    " reference image" +
-                    (referenceUris.size() == 1 ? "" : "s") +
-                    " selected"
-        );
+        new AlertDialog.Builder(this)
+            .setTitle("Settings")
+            .setItems(options, (dialog, which) -> {
+                if (which == 0) {
+                    showApiKeyDialog();
+                } else if (which == 1) {
+                    showMasterPromptDialog();
+                } else if (which == 2) {
+                    showRenameDialog();
+                } else if (which == 3) {
+                    apiKeyStore.clear();
+                    toast("Gemini API key cleared.");
+                    if (currentScreen == SCREEN_GENERATE) {
+                        showScreen(SCREEN_GENERATE);
+                    }
+                } else if (which == 4) {
+                    startActivity(
+                        new Intent(
+                            this,
+                            DesktopCompanionActivity.class
+                        )
+                    );
+                }
+            })
+            .show();
     }
 
     private void showApiKeyDialog() {
@@ -398,306 +1426,153 @@ public class MainActivity extends Activity {
         );
 
         AlertDialog dialog = new AlertDialog.Builder(this)
-            .setTitle("One-time Gemini API key")
+            .setTitle("Gemini API key")
             .setMessage(
-                "Saved encrypted with Android Keystore. You will not have to fill this again."
+                "One-time setup. The key is encrypted with Android Keystore and is never bundled in the APK."
             )
             .setView(input)
             .setPositiveButton("Save", null)
             .setNegativeButton("Cancel", null)
             .create();
 
-        dialog.setOnShowListener(ignored -> {
+        dialog.setOnShowListener(ignored ->
             dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setOnClickListener(v -> {
                     String value = input.getText().toString().trim();
                     if (value.length() < 20) {
-                        input.setError("Paste the full Gemini API key");
+                        input.setError("Paste the full API key.");
                         return;
                     }
 
                     try {
                         apiKeyStore.save(value);
-                        refreshKeyStatus();
+                        toast("API key saved securely.");
                         dialog.dismiss();
+                        if (currentScreen == SCREEN_GENERATE) {
+                            showScreen(SCREEN_GENERATE);
+                        }
                     } catch (Exception error) {
-                        Toast.makeText(
-                            this,
-                            "Could not save key: " + error.getMessage(),
-                            Toast.LENGTH_LONG
-                        ).show();
+                        toast(
+                            "Could not save key: " +
+                            safeMessage(error, "Unknown error")
+                        );
                     }
-                });
-        });
-
+                })
+        );
         dialog.show();
     }
 
     private void showMasterPromptDialog() {
-        EditText input = new EditText(this);
-        input.setText(masterPrompt);
-        input.setMinLines(12);
-        input.setGravity(Gravity.TOP);
-        input.setInputType(
-            InputType.TYPE_CLASS_TEXT |
-            InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        EditText input = editor(
+            "Master continuity prompt",
+            12
         );
+        input.setText(project.masterPrompt);
 
         new AlertDialog.Builder(this)
-            .setTitle("Master continuity prompt")
+            .setTitle("Continuity prompt")
             .setMessage(
-                "Already filled for cinematic technology-history. Change only if you want a different visual language."
+                "Already filled for The Rise / cinematic tech-history."
             )
             .setView(input)
-            .setPositiveButton("Save", (d, which) -> {
-                masterPrompt = input.getText().toString().trim();
-                if (masterPrompt.isEmpty()) {
-                    masterPrompt = DEFAULT_MASTER;
-                }
-                saveDraft();
+            .setPositiveButton("Save", (dialog, which) -> {
+                String value = input.getText().toString().trim();
+                project.masterPrompt =
+                    value.isEmpty() ? DEFAULT_MASTER : value;
+                store.save(project);
             })
-            .setNeutralButton("Reset", (d, which) -> {
-                masterPrompt = DEFAULT_MASTER;
-                saveDraft();
+            .setNeutralButton("Reset default", (dialog, which) -> {
+                project.masterPrompt = DEFAULT_MASTER;
+                store.save(project);
             })
             .setNegativeButton("Cancel", null)
             .show();
     }
 
-    private void pickReferences() {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.setType("image/*");
-        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        startActivityForResult(intent, PICK_REFERENCES);
-    }
+    private void showRenameDialog() {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setText(project.title);
+        input.setSelectAllOnFocus(true);
 
-    private String compiledPrompt(String narration) {
-        return masterPrompt +
-            "\n\nSCENE NARRATION / FACTUAL INTENT:\n" +
-            narration +
-            "\n\nCOMPOSITION RULES:\n" +
-            "Represent the narration literally and clearly. Favor one strong focal subject. " +
-            "Do not add explanatory on-image text. If the scene names a real product, device, company, person, era, or environment, make that exact subject visually recognizable while staying historically grounded.";
-    }
-
-    private void generate() {
-        String narration = sceneInput.getText().toString().trim();
-        if (narration.isEmpty()) {
-            sceneInput.setError("Paste the narration or scene idea");
-            return;
-        }
-
-        final String apiKey;
-        try {
-            apiKey = apiKeyStore.get();
-        } catch (Exception error) {
-            status.setText("Could not decrypt the saved API key.");
-            return;
-        }
-
-        if (apiKey.isEmpty()) {
-            showApiKeyDialog();
-            return;
-        }
-
-        saveDraft();
-
-        final String model =
-            modelSpinner.getSelectedItem().toString();
-        final String aspect =
-            aspectSpinner.getSelectedItem().toString();
-        final String prompt = compiledPrompt(narration);
-
-        generateButton.setEnabled(false);
-        progress.setVisibility(View.VISIBLE);
-        status.setText("Generating with " + model + "…");
-
-        executor.execute(() -> {
-            try {
-                GeminiImageClient.Result result =
-                    new GeminiImageClient().generate(
-                        apiKey,
-                        model,
-                        prompt,
-                        aspect,
-                        loadReferenceImages()
-                    );
-
-                String savedPath = saveToDownloads(
-                    result.bytes,
-                    result.mimeType
-                );
-
-                mainHandler.post(() -> {
-                    Bitmap bitmap = BitmapFactory.decodeByteArray(
-                        result.bytes,
-                        0,
-                        result.bytes.length
-                    );
-                    preview.setImageBitmap(bitmap);
-                    progress.setVisibility(View.GONE);
-                    generateButton.setEnabled(true);
-                    status.setText(
-                        "Done · auto-saved to " + savedPath
-                    );
-                });
-            } catch (Exception error) {
-                mainHandler.post(() -> {
-                    progress.setVisibility(View.GONE);
-                    generateButton.setEnabled(true);
-                    status.setText(
-                        "Generation failed: " + error.getMessage()
-                    );
-                });
-            }
-        });
-    }
-
-    private List<GeminiImageClient.ReferenceImage>
-    loadReferenceImages() throws Exception {
-        ArrayList<GeminiImageClient.ReferenceImage> output =
-            new ArrayList<>();
-
-        int count = Math.min(8, referenceUris.size());
-        for (int i = 0; i < count; i++) {
-            Uri uri = referenceUris.get(i);
-            String mime = getContentResolver().getType(uri);
-            if (mime == null || !mime.startsWith("image/")) {
-                mime = "image/jpeg";
-            }
-
-            try (InputStream stream =
-                     getContentResolver().openInputStream(uri)) {
-                if (stream == null) continue;
-                output.add(
-                    new GeminiImageClient.ReferenceImage(
-                        readLimited(stream, 12 * 1024 * 1024),
-                        mime
-                    )
-                );
-            }
-        }
-        return output;
-    }
-
-    private byte[] readLimited(
-        InputStream input,
-        int maxBytes
-    ) throws Exception {
-        try (ByteArrayOutputStream output =
-                 new ByteArrayOutputStream()) {
-            byte[] buffer = new byte[16 * 1024];
-            int total = 0;
-            int read;
-
-            while ((read = input.read(buffer)) >= 0) {
-                total += read;
-                if (total > maxBytes) {
-                    throw new Exception(
-                        "Reference image too large. Use under 12 MB."
-                    );
+        new AlertDialog.Builder(this)
+            .setTitle("Rename project")
+            .setView(input)
+            .setPositiveButton("Save", (dialog, which) -> {
+                String value = input.getText().toString().trim();
+                if (!value.isEmpty()) {
+                    project.title = value;
+                    store.save(project);
+                    showScreen(currentScreen);
                 }
-                output.write(buffer, 0, read);
-            }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
 
-            return output.toByteArray();
+    private ProjectStore.Scene findScene(String id) {
+        if (id == null || project == null) return null;
+        for (ProjectStore.Scene scene : project.scenes) {
+            if (id.equals(scene.id)) return scene;
+        }
+        return null;
+    }
+
+    private void refreshReferenceStatus() {
+        if (referenceStatus == null) return;
+        referenceStatus.setText(
+            project.references.isEmpty()
+                ? "No references · optional"
+                : project.references.size() +
+                    " continuity reference" +
+                    (project.references.size() == 1 ? "" : "s") +
+                    " saved"
+        );
+    }
+
+    private void selectSpinner(Spinner spinner, String value) {
+        for (int i = 0; i < spinner.getCount(); i++) {
+            if (value.equals(spinner.getItemAtPosition(i).toString())) {
+                spinner.setSelection(i);
+                return;
+            }
         }
     }
 
-    private String saveToDownloads(
-        byte[] bytes,
-        String mime
-    ) throws Exception {
-        String extension =
-            mime != null && mime.contains("png") ? ".png" : ".jpg";
-        String fileName =
-            "Continuity_" + System.currentTimeMillis() + extension;
-        String folder = "Continuity Studio/Generated";
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            ContentValues values = new ContentValues();
-            values.put(MediaStore.Downloads.DISPLAY_NAME, fileName);
-            values.put(
-                MediaStore.Downloads.MIME_TYPE,
-                mime == null ? "image/jpeg" : mime
-            );
-            values.put(
-                MediaStore.Downloads.RELATIVE_PATH,
-                Environment.DIRECTORY_DOWNLOADS + "/" + folder
-            );
-            values.put(MediaStore.Downloads.IS_PENDING, 1);
-
-            Uri destination = getContentResolver().insert(
-                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-                values
-            );
-
-            if (destination == null) {
-                throw new Exception("Could not create Downloads file.");
-            }
-
-            try (OutputStream output =
-                     getContentResolver()
-                         .openOutputStream(destination)) {
-                if (output == null) {
-                    throw new Exception(
-                        "Could not open Downloads file."
-                    );
-                }
-                output.write(bytes);
-            }
-
-            values.clear();
-            values.put(MediaStore.Downloads.IS_PENDING, 0);
-            getContentResolver().update(
-                destination,
-                values,
-                null,
-                null
-            );
-        } else {
-            File directory = new File(
-                Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_DOWNLOADS
-                ),
-                folder
-            );
-
-            if (!directory.exists() &&
-                !directory.mkdirs()) {
-                throw new Exception(
-                    "Could not create Downloads folder."
-                );
-            }
-
-            try (FileOutputStream output =
-                     new FileOutputStream(
-                         new File(directory, fileName)
-                     )) {
-                output.write(bytes);
-            }
-        }
-
-        return "Downloads/" + folder + "/" + fileName;
+    private String durationLabel(long ms) {
+        long seconds = Math.max(0, Math.round(ms / 1000d));
+        long minutes = seconds / 60;
+        seconds %= 60;
+        return String.format(Locale.US, "%d:%02d", minutes, seconds);
     }
 
-    private void openExternal(String url) {
-        try {
-            startActivity(
-                new Intent(
-                    Intent.ACTION_VIEW,
-                    Uri.parse(url)
-                )
-            );
-        } catch (Exception ignored) {
-        }
+    private String mimeForPath(String path) {
+        String lower = path.toLowerCase(Locale.US);
+        if (lower.endsWith(".png")) return "image/png";
+        if (lower.endsWith(".webp")) return "image/webp";
+        return "image/jpeg";
     }
 
-    @Override
-    protected void onPause() {
-        saveDraft();
-        super.onPause();
+    private String sanitizeFile(String value) {
+        String output =
+            value == null || value.trim().isEmpty()
+                ? "Continuity-Subtitles"
+                : value.trim();
+        return output
+            .replaceAll("[\\\\/:*?\"<>|]", "_")
+            .replaceAll("\\s+", "-");
+    }
+
+    private String safeMessage(Throwable error, String fallback) {
+        if (error == null || error.getMessage() == null ||
+            error.getMessage().trim().isEmpty()) {
+            return fallback;
+        }
+        return error.getMessage().trim();
+    }
+
+    private void toast(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
     @Override
@@ -708,50 +1583,125 @@ public class MainActivity extends Activity {
     ) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if (requestCode != PICK_REFERENCES ||
-            resultCode != RESULT_OK ||
-            data == null) {
+        if (resultCode != RESULT_OK || data == null) return;
+
+        if (requestCode == PICK_REFERENCES) {
+            ArrayList<Uri> uris = new ArrayList<>();
+
+            if (data.getClipData() != null) {
+                int count = Math.min(
+                    8,
+                    data.getClipData().getItemCount()
+                );
+                for (int i = 0; i < count; i++) {
+                    uris.add(
+                        data.getClipData().getItemAt(i).getUri()
+                    );
+                }
+            } else if (data.getData() != null) {
+                uris.add(data.getData());
+            }
+
+            executor.execute(() -> {
+                try {
+                    project.references.clear();
+                    for (Uri uri : uris) {
+                        project.references.add(
+                            MediaFiles.copyUriToProject(
+                                this,
+                                uri,
+                                project.id,
+                                "reference"
+                            )
+                        );
+                    }
+                    store.save(project);
+
+                    mainHandler.post(() -> {
+                        refreshReferenceStatus();
+                        toast(
+                            project.references.size() +
+                            " reference image(s) saved."
+                        );
+                        if (currentScreen == SCREEN_HOME) {
+                            showScreen(SCREEN_HOME);
+                        }
+                    });
+                } catch (Exception error) {
+                    mainHandler.post(() ->
+                        toast(
+                            "Could not import reference: " +
+                            safeMessage(error, "Unknown error")
+                        )
+                    );
+                }
+            });
             return;
         }
 
-        referenceUris.clear();
-
-        if (data.getClipData() != null) {
-            int count = Math.min(
-                8,
-                data.getClipData().getItemCount()
-            );
-
-            for (int i = 0; i < count; i++) {
-                Uri uri = data.getClipData()
-                    .getItemAt(i)
-                    .getUri();
-                referenceUris.add(uri);
-
-                try {
-                    getContentResolver()
-                        .takePersistableUriPermission(
-                            uri,
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        );
-                } catch (Exception ignored) {
-                }
-            }
-        } else if (data.getData() != null) {
+        if (requestCode == PICK_VOICEOVER && data.getData() != null) {
             Uri uri = data.getData();
-            referenceUris.add(uri);
-
-            try {
-                getContentResolver()
-                    .takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+            executor.execute(() -> {
+                try {
+                    project.voiceoverPath =
+                        MediaFiles.copyUriToProject(
+                            this,
+                            uri,
+                            project.id,
+                            "voiceover"
+                        );
+                    store.save(project);
+                    mainHandler.post(() -> {
+                        toast("Voiceover saved to project.");
+                        showScreen(SCREEN_EXPORT);
+                    });
+                } catch (Exception error) {
+                    mainHandler.post(() ->
+                        toast(
+                            "Could not import voiceover: " +
+                            safeMessage(error, "Unknown error")
+                        )
                     );
-            } catch (Exception ignored) {
-            }
+                }
+            });
+            return;
         }
 
-        refreshReferenceStatus();
+        if (requestCode == PICK_SCENE_IMAGE &&
+            data.getData() != null &&
+            pendingSceneImageId != null) {
+            Uri uri = data.getData();
+            ProjectStore.Scene scene =
+                findScene(pendingSceneImageId);
+            String sceneId = pendingSceneImageId;
+            pendingSceneImageId = null;
+
+            if (scene == null) return;
+
+            executor.execute(() -> {
+                try {
+                    scene.imagePath =
+                        MediaFiles.copyUriToProject(
+                            this,
+                            uri,
+                            project.id,
+                            "scene-" + sceneId
+                        );
+                    store.save(project);
+                    mainHandler.post(() -> {
+                        toast("Scene image replaced.");
+                        showScreen(SCREEN_STORYBOARD);
+                    });
+                } catch (Exception error) {
+                    mainHandler.post(() ->
+                        toast(
+                            "Could not import scene image: " +
+                            safeMessage(error, "Unknown error")
+                        )
+                    );
+                }
+            });
+        }
     }
 
     @Override
