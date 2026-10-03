@@ -20,6 +20,7 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 10.17.1
+      # Intentionally no setup-node cache: no dependency lockfile is committed at repo root.
       - uses: actions/setup-node@v4
         with:
           node-version: 24
