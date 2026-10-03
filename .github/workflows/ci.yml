@@ -28,5 +28,7 @@ jobs:
       - run: pnpm db:generate
       - run: pnpm typecheck
       - run: node --check scripts/flow-bridge.mjs
+      - run: node --check scripts/setup-local.mjs
+      - run: docker compose -f docker-compose.local.yml config
       - run: pnpm test
       - run: pnpm build

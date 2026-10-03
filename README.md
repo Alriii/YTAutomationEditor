@@ -2,229 +2,81 @@
 
 Continuity Studio is a continuity-first production workspace for long-form faceless YouTube and documentary creators.
 
-Its main job is not merely generating images. It keeps a project moving through a staged workflow while preserving visual identity across dozens of scenes.
-
-## Current workflow
+## Production workflow
 
 ```text
 Project
-  -> Script (paste or import TXT/Markdown)
+  -> Script
   -> Style / Master Reference
   -> Cast
   -> World
-  -> Voiceover (upload MP3/WAV/M4A)
+  -> Voiceover
   -> Scene Breakdown
   -> Human Scene Review
   -> Storyboard
   -> Google Flow Generation
-  -> Captions (import SRT/VTT or auto-build from narration)
-  -> Review Player
+  -> Captions
+  -> Review
   -> Export
 ```
 
-Scene breakdown never starts image generation automatically.
+Scene breakdown never auto-starts image generation. The creator reviews and approves scenes first.
 
-The creator must review and approve scenes first. Google Flow generation is a separate explicit stage.
+## Free local mode
 
-## Google Flow generation
+The default local setup does not require Clerk, Neon, Cloudflare R2, or hosted Inngest.
 
-Continuity Studio now includes a local Flow bridge for `flow.google.com`.
+It uses:
 
-The bridge runs only on the creator's computer and drives a persistent Playwright browser profile. Google sign-in remains inside that local browser profile. Continuity Studio does not ask for or store the creator's Google password or Flow cookies in the database.
+- PostgreSQL in Docker
+- MinIO for private S3-compatible storage
+- Inngest Dev Server in Docker
+- one explicit local workspace user
+- a zero-cost local script splitter when no Gemini key is configured
+- your own signed-in `flow.google.com` browser session for image generation
 
-The Flow screen currently exposes:
+Google controls Flow model availability and any Flow credits on your Google account. Continuity Studio does not create or bypass those credits.
 
-- Nano Banana 2 Lite
-- Nano Banana 2
-- Nano Banana Pro
+### Quick start
 
-The model labels are the Flow product labels, not Gemini API IDs.
-
-For each approved scene, Continuity Studio:
-
-1. Compiles the STRICT continuity package.
-2. Prioritizes character references, then location references, then style/master references.
-3. Creates temporary signed reference URLs.
-4. Sends the prompt, aspect ratio, model choice, and references to the local Flow bridge.
-5. The bridge opens the creator's existing Flow project.
-6. It selects Image mode and the selected Nano Banana model.
-7. It uploads reference ingredients.
-8. It submits the image prompt.
-9. It captures the generated image.
-10. Continuity Studio stores that image in the matching scene's immutable render history.
-
-### Start the local Flow bridge
-
-The bridge first tries to use an installed Brave, Chrome, or Edge browser on Windows. If none is available, install Playwright Chromium once:
-
-```bash
-pnpm flow:install
-```
-
-Then run the bridge in a second terminal:
-
-```bash
-pnpm flow:bridge
-```
-
-The bridge listens only on:
-
-```text
-http://127.0.0.1:4317
-```
-
-The default allowed web origin is:
-
-```text
-http://localhost:3000
-```
-
-The persistent browser profile is stored in:
-
-```text
-.flow-browser-profile/
-```
-
-That folder is intentionally gitignored because it may contain the creator's Google session.
-
-Flow's UI can change over time. The bridge therefore uses resilient visible-text/role selectors, but it remains a browser integration rather than a public Google API and may occasionally need selector maintenance.
-
-## Creator-owned inputs
-
-The project does not force creators to use generated material.
-
-Creators can provide their own:
-
-- Master/style reference images
-- Character reference images
-- Location reference images
-- Script
-- Voiceover
-- Subtitle file
-- Scene images
-
-Uploaded scene images join the same scene asset history as generated Flow images and can become the selected/locked render.
-
-## Voiceover
-
-The Voiceover stage accepts:
-
-- MP3
-- WAV
-- M4A
-
-The active voiceover is stored as a project track and is available in the Review player.
-
-Uploading a replacement changes the active track while older media remains in asset history.
-
-## Captions
-
-The Captions stage supports:
-
-- SRT import
-- WebVTT import
-- Editable start/end times
-- Editable text
-- Adding/removing cues
-- SRT download
-- Free first-pass caption generation from storyboard narration and scene durations
-
-The free auto-caption pass is timing-based, not speech recognition. It is intended as an editable starting point and should be checked against the voiceover.
-
-## Review player
-
-The Review stage combines:
-
-- Selected scene images
-- Scene timing
-- Master voiceover
-- Subtitle cues
-
-It provides:
-
-- Play/pause
-- Seeking
-- Scene switching
-- Subtitle overlay
-- Timeline thumbnails
-- Current narration/caption inspector
-
-This is a lightweight rough-cut review surface, not a full NLE.
-
-## Workspace
-
-```text
-apps/
-  web/          Next.js application, APIs, review UI, Inngest jobs
-
-packages/
-  ai/           Continuity compiler and structured scene planning
-  db/           Prisma schema and PostgreSQL client
-  shared/       Zod schemas, subtitle parser/exporter, domain types
-
-scripts/
-  flow-bridge.mjs
-```
-
-## Requirements
+Requirements:
 
 - Node.js 24+
 - pnpm 10+
-- PostgreSQL
-- Clerk
-- Cloudflare R2 or compatible S3 storage
-- Inngest for durable server jobs
-- Chromium for the local Flow bridge
+- Docker Desktop, or Docker Engine + Docker Compose
+- Brave, Chrome, or Edge
 
-A Gemini API key is optional for script-breakdown assistance. Image generation through the visible product workflow uses the local Flow bridge.
-
-## Local setup
-
-Clone and install:
+Install:
 
 ```bash
 git clone git@github.com:Alriii/YTAutomationEditor.git
 cd YTAutomationEditor
-
 corepack enable
 pnpm install
 ```
 
-Create local environment variables:
+Prepare the free local stack:
 
 ```bash
-cp .env.example .env
+pnpm local:start
 ```
 
-Generate the credential-encryption key:
+That command:
 
-```bash
-openssl rand -base64 32
-```
+1. creates `apps/web/.env.local`
+2. creates `packages/db/.env`
+3. generates a fresh local encryption key
+4. starts PostgreSQL
+5. starts MinIO
+6. creates the private `continuity` bucket
+7. starts the Inngest Dev Server
+8. generates Prisma
+9. pushes the development database schema
 
-Generate Prisma and create the development schema:
-
-```bash
-pnpm db:generate
-pnpm db:push
-```
-
-Run the web app:
+Then start the web app:
 
 ```bash
 pnpm dev
-```
-
-For Flow generation, in another terminal:
-
-```bash
-pnpm flow:bridge
-```
-
-If the bridge reports that no browser can be launched, install its fallback Chromium once:
-
-```bash
-pnpm flow:install
 ```
 
 Open:
@@ -233,56 +85,176 @@ Open:
 http://localhost:3000
 ```
 
-On first Flow use, the bridge opens a browser. Sign into Google there and create/select the Flow project you want Continuity Studio to use.
+Local mode has no sign-in screen. It uses a single local creator workspace.
 
-## Environment variables
+For Google Flow image generation, run in another terminal:
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `NEXT_PUBLIC_APP_URL` | yes | Application origin |
-| `ENCRYPTION_KEY_BASE64` | yes | 32-byte AES key for stored BYOK credentials |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | yes | Clerk browser key |
-| `CLERK_SECRET_KEY` | yes | Clerk server key |
-| `DATABASE_URL` | yes | PostgreSQL connection |
-| `R2_ACCOUNT_ID` | yes | Cloudflare account |
-| `R2_ACCESS_KEY_ID` | yes | R2 S3 key |
-| `R2_SECRET_ACCESS_KEY` | yes | R2 S3 secret |
-| `R2_BUCKET` | yes | Private object bucket |
-| `INNGEST_EVENT_KEY` | hosted Inngest | Inngest event key |
-| `INNGEST_SIGNING_KEY` | hosted Inngest | Inngest signing key |
-| `GEMINI_API_KEY` | optional | Structured script-breakdown assistance |
-| `FLOW_BRIDGE_PORT` | optional | Local bridge port, defaults to 4317 |
-| `FLOW_ALLOWED_ORIGIN` | optional | Web origin allowed to call the bridge |
-| `FLOW_PROFILE_DIR` | optional | Custom local browser-profile folder |
+```bash
+pnpm flow:bridge
+```
 
-## Security model
+The bridge first tries an installed Brave, Chrome, or Edge browser. If none is available:
 
-- Project queries are owner-scoped on the server.
-- R2 assets remain private and use short-lived signed URLs.
-- Provider credentials are encrypted with AES-256-GCM.
-- Google Flow login stays in the local Playwright profile.
-- The Flow profile is gitignored.
-- Flow reference URLs expire.
-- Scene assets are immutable.
-- Selecting a new image changes only the selection pointer.
-- Locked scenes are skipped by automated generation passes.
-- Continuity fingerprints include provider/model/reference identity.
+```bash
+pnpm flow:install
+pnpm flow:bridge
+```
+
+On first use, sign into Google in the browser opened by the bridge and select or create the Flow project you want Continuity Studio to use.
+
+Stop local infrastructure with:
+
+```bash
+pnpm local:down
+```
+
+PostgreSQL and MinIO use Docker volumes, so stopping containers does not erase project data.
+
+### Local service addresses
+
+| Service | Address |
+| --- | --- |
+| Continuity Studio | `http://localhost:3000` |
+| Flow bridge | `http://127.0.0.1:4317` |
+| Inngest Dev UI | `http://127.0.0.1:8288` |
+| MinIO API | `http://127.0.0.1:9000` |
+| MinIO Console | `http://127.0.0.1:9001` |
+| PostgreSQL | `127.0.0.1:5432` |
+
+## Google Flow generation
+
+The local Flow bridge drives the creator's own signed-in `flow.google.com` browser session.
+
+The Flow stage exposes:
+
+- Nano Banana 2 Lite
+- Nano Banana 2
+- Nano Banana Pro
+
+For each approved scene, Continuity Studio:
+
+1. compiles the STRICT continuity package
+2. prioritizes character references, then location references, then master/style references
+3. creates short-lived signed reference URLs
+4. sends prompt, aspect ratio, model label, and references to the local bridge
+5. uploads the references into Flow
+6. submits the prompt
+7. captures the resulting image
+8. stores the image back in that scene's immutable render history
+
+The Google session stays in `.flow-browser-profile/`, which is gitignored. Google credentials/cookies are not copied into the application database.
+
+Flow is a web product, so its UI can change. The bridge is isolated so selector maintenance does not alter project/continuity data.
+
+## Free script breakdown
+
+In local mode, scene breakdown works with no AI API key.
+
+The deterministic local splitter:
+
+- preserves exact narration text
+- divides narration into editable visual scenes
+- estimates scene duration
+- detects known characters by name
+- detects known locations by name
+- clearly marks scenes for human visual/factual review
+
+If a Gemini key is configured, the richer Gemini breakdown can be used instead.
+
+Both paths end at Human Scene Review. Neither path starts image generation.
+
+## Creator-owned media
+
+Creators can provide their own:
+
+- master/style reference images
+- character reference images
+- location reference images
+- script by paste, TXT, or Markdown
+- voiceover via MP3, WAV, or M4A
+- subtitles via SRT or WebVTT
+- scene images
+
+Manual scene images enter the same scene render history as Flow-generated images and can be selected/locked.
+
+## Voiceover
+
+The Voiceover stage keeps one active master narration track. Replacing the active track does not delete older media assets.
+
+The Review player uses the active voiceover as its playback clock.
+
+## Captions
+
+Captions support:
+
+- SRT import
+- WebVTT import
+- editable text
+- editable start/end timing
+- adding/removing cues
+- free first-pass cues from scene narration/timing
+- SRT download
+- saved subtitle appearance
+
+Appearance controls include:
+
+- Documentary, Shorts/Bold, Minimal, Custom presets
+- font size
+- text color
+- font weight
+- top/center/bottom position
+- background opacity
+- maximum width
+- optional black outline
+
+Subtitle appearance is used in the Review player and preserved in export metadata.
+
+The free narration-based caption pass is timing-based, not speech recognition. Review it against the actual voiceover.
+
+## Review player and editing
+
+The Review stage combines:
+
+- selected scene images
+- scene timing
+- master voiceover
+- subtitles
+- subtitle styling
+- image framing
+- simple motion
+- simple transitions
+
+Per-scene visual controls include:
+
+- fill frame / fit whole image
+- zoom
+- X/Y position
+- still
+- slow zoom in/out
+- pan left/right/up/down
+- cut
+- fade through black
+- fade duration
+
+Playback follows the actual audio clock and uses `requestAnimationFrame` for smooth motion.
+
+These edits are non-destructive. The source image is unchanged and the edit settings are stored in `Scene.mediaSettings`.
 
 ## Continuity Compiler
 
-The STRICT compiler assembles each scene from:
+STRICT compilation order:
 
-1. Output contract and aspect ratio
-2. Versioned Style Bible
-3. Exact CharacterVersion rows
-4. Exact LocationVersion
-5. Scene visual intent
-6. Shot/camera/lighting notes
-7. Negative constraints
-8. Master/style/character/location references
-9. Provider/model identity
+1. output contract and aspect ratio
+2. Style Bible
+3. historical/world constraints
+4. exact CharacterVersion locks
+5. exact LocationVersion lock
+6. scene intent/action/camera/lighting
+7. negative constraints
+8. reference assets
+9. generation surface/model identity
 
-Reference ordering is intentional:
+Reference priority:
 
 ```text
 Characters
@@ -290,42 +262,102 @@ Characters
   -> Master / Style
 ```
 
-If a generation surface limits ingredient count, identity continuity wins first.
-
 ## Export
 
-The current ZIP export contains the selected scene images, active voiceover when present, editable SRT subtitles when present, and a manifest:
+The current ZIP package contains:
 
 ```text
 SCENE_001.jpg
 SCENE_002.jpg
 ...
-voiceover.mp3   # or .wav/.m4a when present
+voiceover.mp3   # or WAV/M4A when present
 subtitles.srt   # when captions exist
 manifest.json
 ```
 
-The manifest also preserves per-scene timing and non-destructive framing settings. The in-app Review player combines those assets for review. A final rendered MP4 exporter remains a later step.
+The manifest preserves:
+
+- scene order
+- start time
+- duration
+- narration
+- lock state
+- image framing
+- motion
+- transitions
+- voiceover filename
+- subtitle filename
+- subtitle style/settings
+
+A final rendered MP4 exporter is the next major finishing milestone.
+
+## Hosted mode
+
+Use `LOCAL_MODE=false` for hosted deployment.
+
+Hosted mode supports:
+
+- Clerk authentication
+- PostgreSQL/Neon
+- Cloudflare R2 or generic S3-compatible storage
+- hosted Inngest
+- encrypted Google Gemini BYOK for optional AI-assisted breakdown
+
+If `S3_ENDPOINT` is configured, generic S3 storage is used. Otherwise storage falls back to R2.
+
+## Environment variables
+
+`pnpm local:setup` creates local environment files automatically.
+
+For hosted deployment, use `.env.example` and configure the hosted services you select.
+
+Useful Flow bridge overrides:
+
+| Variable | Purpose |
+| --- | --- |
+| `FLOW_BRIDGE_PORT` | bridge port, default 4317 |
+| `FLOW_ALLOWED_ORIGIN` | web origin allowed to call bridge |
+| `FLOW_PROFILE_DIR` | local persistent browser profile |
+| `FLOW_BROWSER_PATH` | explicit Chrome/Edge/Brave path |
+
+## Security
+
+- hosted project access is server owner-scoped
+- local mode uses one explicit local user
+- Google Flow login stays in the local browser profile
+- Flow browser profile is gitignored
+- object storage remains private
+- browser object access uses short-lived signed URLs
+- BYOK secrets use AES-256-GCM
+- scene assets are immutable
+- selecting another image changes only the selection pointer
+- locked scenes are skipped by automated generation
+- continuity fingerprints include model/reference identity
 
 ## Verification
+
+CI runs:
 
 ```bash
 pnpm db:generate
 pnpm typecheck
+node --check scripts/flow-bridge.mjs
+node --check scripts/setup-local.mjs
+docker compose -f docker-compose.local.yml config
 pnpm test
 pnpm build
 ```
 
-GitHub Actions runs all four checks on `main`.
+There is intentionally no `actions/setup-node` dependency cache yet because the repository currently has no committed dependency lockfile.
 
-## Not built yet
+## Still outside the current slice
 
-- Full professional NLE timeline
-- Final MP4 rendering
+- full professional NLE timeline
+- final MP4 rendering
 - CapCut/Premiere project exporters
-- Team collaboration
-- Marketplace
-- Video/motion generation
-- FREE/BALANCED continuity modes
+- team collaboration
+- marketplace
+- AI video/motion generation
+- FREE/BALANCED continuity compiler modes
 
-The current target remains the staged Framesail-like production workflow with Continuity Studio's own continuity compiler and Google Flow as the image-generation surface.
+The target is a staged Framesail-like production workflow with Continuity Studio's own continuity compiler and Google Flow as the image-generation surface.
