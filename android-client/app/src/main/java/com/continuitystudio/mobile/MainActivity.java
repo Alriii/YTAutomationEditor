@@ -1855,6 +1855,19 @@ public class MainActivity extends Activity {
         return error.getMessage().trim();
     }
 
+    private void openExternal(String url) {
+        try {
+            startActivity(
+                new Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse(url)
+                )
+            );
+        } catch (Exception error) {
+            toast("Could not open link.");
+        }
+    }
+
     private void toast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
