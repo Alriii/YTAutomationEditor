@@ -55,7 +55,7 @@ export const exportProjectFunction = inngest.createFunction(
       const exportRecord = await db.export.findUnique({ where: { id: input.exportId } });
       if (!exportRecord) throw new Error("Export record not found.");
 
-      const [scenes, voiceTrack, subtitleCues] = await Promise.all([
+      const [scenes, voiceTrack, subtitleCues, subtitleTrack] = await Promise.all([
         db.scene.findMany({
         where: { projectId: job.projectId },
         orderBy: { sceneNumber: "asc" },
@@ -77,6 +77,15 @@ export const exportProjectFunction = inngest.createFunction(
         db.subtitleCue.findMany({
           where: { projectId: job.projectId },
           orderBy: [{ startMs: "asc" }, { order: "asc" }],
+        }),
+        db.projectTrack.findUnique({
+          where: {
+            projectId_type: {
+              projectId: job.projectId,
+              type: "SUBTITLES",
+            },
+          },
+          select: { settings: true },
         }),
       ]);
 
@@ -108,6 +117,7 @@ export const exportProjectFunction = inngest.createFunction(
               mimeType: voiceTrack.asset.mimeType,
             }
           : null,
+        subtitleSettings: subtitleTrack?.settings ?? null,
         subtitleCues: subtitleCues.map((cue) => ({
           order: cue.order,
           startMs: cue.startMs,
@@ -183,6 +193,7 @@ export const exportProjectFunction = inngest.createFunction(
         totalDurationMs: cursorMs,
         voiceoverFile,
         subtitleFile,
+        subtitleSettings: data.subtitleSettings,
         scenes: manifestScenes,
       };
 

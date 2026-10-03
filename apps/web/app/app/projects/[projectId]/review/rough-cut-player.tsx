@@ -4,6 +4,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Play, RotateCcw, Volume2 } from "lucide-react";
 import type { SubtitleCueInput } from "@continuity/shared";
 
+type CaptionStyle = {
+  preset: "DOCUMENTARY" | "SHORTS" | "MINIMAL" | "CUSTOM";
+  fontSize: number;
+  textColor: string;
+  backgroundOpacity: number;
+  position: "TOP" | "CENTER" | "BOTTOM";
+  fontWeight: "NORMAL" | "SEMIBOLD" | "BOLD";
+  outline: boolean;
+  maxWidthPct: number;
+};
+
 type FrameSettings = {
   fit: "cover" | "contain";
   scale: number;
@@ -38,11 +49,13 @@ export function RoughCutPlayer({
   voiceUrl,
   scenes,
   cues,
+  captionStyle,
 }: {
   aspectRatio: "LANDSCAPE_16_9" | "VERTICAL_9_16" | "SQUARE_1_1";
   voiceUrl: string | null;
   scenes: PreviewScene[];
   cues: SubtitleCueInput[];
+  captionStyle: CaptionStyle;
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const frameRef = useRef<number | undefined>(undefined);
@@ -75,6 +88,13 @@ export function RoughCutPlayer({
   const activeCue = cues.find(
     (cue) => currentMs >= cue.startMs && currentMs < cue.endMs,
   );
+
+  const captionWeight =
+    captionStyle.fontWeight === "BOLD"
+      ? 800
+      : captionStyle.fontWeight === "SEMIBOLD"
+        ? 650
+        : 400;
 
   const currentFraming = currentScene
     ? framing[currentScene.id] ?? currentScene.framing
@@ -210,9 +230,31 @@ export function RoughCutPlayer({
             </div>
           )}
 
-          <div className="pointer-events-none absolute inset-x-4 bottom-6 flex justify-center">
+          <div
+            className={
+              "pointer-events-none absolute inset-x-4 flex justify-center " +
+              (captionStyle.position === "TOP"
+                ? "top-6"
+                : captionStyle.position === "CENTER"
+                  ? "top-1/2 -translate-y-1/2"
+                  : "bottom-6")
+            }
+          >
             {activeCue && (
-              <div className="max-w-[90%] rounded-lg bg-black/70 px-4 py-2 text-center text-base font-semibold leading-snug text-white shadow-lg sm:text-xl">
+              <div
+                className="rounded-lg px-4 py-2 text-center leading-tight shadow-lg"
+                style={{
+                  maxWidth: `${captionStyle.maxWidthPct}%`,
+                  color: captionStyle.textColor,
+                  fontSize: `${captionStyle.fontSize}px`,
+                  fontWeight: captionWeight,
+                  backgroundColor: `rgba(0, 0, 0, ${captionStyle.backgroundOpacity})`,
+                  WebkitTextStroke: captionStyle.outline
+                    ? "1.5px black"
+                    : undefined,
+                  paintOrder: captionStyle.outline ? "stroke fill" : undefined,
+                }}
+              >
                 {activeCue.text}
               </div>
             )}
