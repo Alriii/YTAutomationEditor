@@ -101,7 +101,7 @@ export const imageGenerationFunction = inngest.createFunction(
       };
     });
 
-    const generated = await step.run("generate-image", async () => {
+    const stored = await step.run("generate-and-store-image", async () => {
       const apiKey = await getProviderApiKey(job.userId, job.provider);
       const provider = getImageProvider(job.provider);
       const references = await Promise.all(
@@ -112,7 +112,7 @@ export const imageGenerationFunction = inngest.createFunction(
         })),
       );
 
-      return provider.generate(
+      const generated = await provider.generate(
         {
           model: job.model,
           prompt: job.continuity.compiledPrompt,
@@ -123,9 +123,7 @@ export const imageGenerationFunction = inngest.createFunction(
         },
         apiKey,
       );
-    });
 
-    const stored = await step.run("persist-image", async () => {
       const image = generated.images[0];
       if (!image) throw new Error("Provider returned no image.");
 
@@ -145,10 +143,19 @@ export const imageGenerationFunction = inngest.createFunction(
         contentType: image.mimeType,
       });
 
+      return {
+        storageKey,
+        mimeType: image.mimeType,
+        width: image.width ?? null,
+        height: image.height ?? null,
+        providerAssetId: image.providerAssetId ?? null,
+        providerJobId: generated.providerJobId ?? null,
+        providerCostUsd: generated.usage?.providerCostUsd ?? null,
+      };
+    });
+
+    const persisted = await step.run("persist-generation-result", async () => {
       const actualCredits = job.estimatedCredits;
-      const providerCostUsd =
-        generated.usage?.providerCostUsd ??
-        undefined;
 
       return db.$transaction(async (tx) => {
         const asset = await tx.asset.create({
@@ -160,12 +167,12 @@ export const imageGenerationFunction = inngest.createFunction(
             role: "SCENE_RENDER",
             provider: job.provider,
             model: job.model,
-            storageKey,
-            mimeType: image.mimeType,
-            width: image.width,
-            height: image.height,
+            storageKey: stored.storageKey,
+            mimeType: stored.mimeType,
+            width: stored.width,
+            height: stored.height,
             sourcePrompt: job.continuity.compiledPrompt,
-            providerAssetId: image.providerAssetId,
+            providerAssetId: stored.providerAssetId,
           },
         });
 
@@ -184,22 +191,40 @@ export const imageGenerationFunction = inngest.createFunction(
             progress: 100,
             completedAt: new Date(),
             actualCredits,
-            actualUsd: providerCostUsd,
-            providerJobId: generated.providerJobId,
+            actualUsd: stored.providerCostUsd,
+            providerJobId: stored.providerJobId,
           },
         });
 
         if (job.estimatedCredits > 0) {
-          await tx.usageLedger.create({
-            data: {
-              userId: job.userId,
-              projectId: job.projectId,
-              generationJobId: job.id,
-              type: "CAPTURE",
-              credits: -actualCredits,
-              providerCostUsd,
-            },
+          await tx.usageLedger.createMany({
+            data: [
+              {
+                userId: job.userId,
+                projectId: job.projectId,
+                generationJobId: job.id,
+                type: "RELEASE",
+                credits: job.estimatedCredits,
+                metadata: { reason: "reservation_settlement" },
+              },
+              {
+                userId: job.userId,
+                projectId: job.projectId,
+                generationJobId: job.id,
+                type: "CAPTURE",
+                credits: -actualCredits,
+                providerCostUsd: stored.providerCostUsd,
+              },
+            ],
           });
+
+          const adjustment = job.estimatedCredits - actualCredits;
+          if (adjustment !== 0) {
+            await tx.user.update({
+              where: { id: job.userId },
+              data: { creditBalanceCached: { increment: adjustment } },
+            });
+          }
         }
 
         return { assetId: asset.id };
@@ -222,6 +247,6 @@ export const imageGenerationFunction = inngest.createFunction(
       }
     });
 
-    return stored;
+    return persisted;
   },
 );
