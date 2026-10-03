@@ -49,8 +49,8 @@ export function SceneReview({
   const [scenes, setScenes] = useState(initialScenes);
   const [busy, setBusy] = useState<string>();
   const [message, setMessage] = useState<string>();
-  const [provider, setProvider] = useState("openai");
-  const [model, setModel] = useState("gpt-image-2.5-flare");
+  const provider = "google";
+  const [model, setModel] = useState("gemini-3.1-flash-image");
   const [estimate, setEstimate] = useState<Estimate>();
 
   const allApproved = useMemo(
@@ -154,19 +154,23 @@ export function SceneReview({
             Approve all reviewed scenes
           </button>
           <select
-            value={provider}
+            value={model}
             onChange={(event) => {
-              const next = event.target.value;
-              setProvider(next);
-              setModel(next === "openai" ? "gpt-image-2.5-flare" : "fal-ai/flux-pro/kontext");
+              setModel(event.target.value);
               setEstimate(undefined);
             }}
-            className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
+            className="min-w-72 rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
           >
-            <option value="openai">OpenAI Images</option>
-            <option value="fal">fal.ai</option>
+            <option value="gemini-3.1-flash-lite-image">
+              Nano Banana 2 Lite · fastest / 1K
+            </option>
+            <option value="gemini-3.1-flash-image">
+              Nano Banana 2 · recommended
+            </option>
+            <option value="gemini-3-pro-image">
+              Nano Banana Pro · highest fidelity
+            </option>
           </select>
-          <input value={model} onChange={(event) => { setModel(event.target.value); setEstimate(undefined); }} className="min-w-56 rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm" />
           <button onClick={calculateEstimate} disabled={!allApproved || busy === "estimate"} className="rounded-xl bg-white/10 px-4 py-2.5 text-sm disabled:opacity-35">
             Calculate cost
           </button>

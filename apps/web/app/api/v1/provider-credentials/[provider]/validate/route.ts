@@ -9,24 +9,18 @@ export async function POST(_request: Request, context: Context) {
   try {
     const user = await requireAppUser();
     const { provider } = await context.params;
-    const apiKey = await getProviderApiKey(user.id, provider);
 
-    let response: Response;
-    if (provider === "openai") {
-      response = await fetch("https://api.openai.com/v1/models", {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      });
-    } else if (provider === "fal") {
-      return Response.json(
-        {
-          valid: null,
-          error: "fal.ai does not expose a verified zero-cost key check in this integration. The key will be validated on first generation.",
-        },
-        { status: 422 },
-      );
-    } else {
+    if (provider !== "google") {
       return Response.json({ error: "Unsupported provider." }, { status: 400 });
     }
+
+    const apiKey = await getProviderApiKey(user.id, provider);
+    const response = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1",
+      {
+        headers: { "x-goog-api-key": apiKey },
+      },
+    );
 
     const valid = response.ok;
     await db.providerCredential.updateMany({
@@ -36,6 +30,7 @@ export async function POST(_request: Request, context: Context) {
         lastValidatedAt: new Date(),
       },
     });
+
     return Response.json({ valid, status: response.status });
   } catch (error) {
     return errorResponse(error);

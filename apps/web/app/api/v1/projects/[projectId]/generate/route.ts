@@ -6,8 +6,8 @@ import { buildProjectGenerationEstimate } from "@/lib/generation/estimate";
 import { inngest } from "@/inngest/client";
 
 const schema = z.object({
-  provider: z.enum(["openai", "fal"]),
-  model: z.string().trim().min(1).max(200),
+  provider: z.literal("google"),
+  model: z.enum(["gemini-3.1-flash-lite-image", "gemini-3.1-flash-image", "gemini-3-pro-image"]),
   estimateHash: z.string().regex(/^[a-f0-9]{64}$/i),
 });
 

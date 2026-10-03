@@ -1,4 +1,4 @@
-import { breakDownScriptWithOpenAI } from "@continuity/ai";
+import { breakDownScriptWithGemini } from "@continuity/ai";
 import { db } from "@continuity/db";
 import { inngest } from "../client";
 import { getProviderApiKey } from "@/lib/providers/credentials";
@@ -97,7 +97,7 @@ export const scriptBreakdownFunction = inngest.createFunction(
     });
 
     const breakdown = await step.run("generate-breakdown", async () => {
-      const apiKey = await getProviderApiKey(snapshot.userId, "openai");
+      const apiKey = await getProviderApiKey(snapshot.userId, "google");
 
       return breakDownScriptWithOpenAI({
         apiKey,

@@ -5,21 +5,30 @@ import { db } from "@continuity/db";
 
 type Context = { params: Promise<{ projectId: string }> };
 
+const ALLOWED_MODELS = new Set([
+  "gemini-3.1-flash-lite-image",
+  "gemini-3.1-flash-image",
+  "gemini-3-pro-image",
+]);
+
 export async function POST(request: Request, context: Context) {
   try {
     const { projectId } = await context.params;
     const { user, project } = await requireOwnedProject(projectId);
+
     const body = (await request.json().catch(() => ({}))) as {
-      provider?: string;
       model?: string;
     };
-    const provider = body.provider ?? project.defaultImageProvider ?? "openai";
+
+    const provider = "google";
     const model =
       body.model ??
       project.defaultImageModel ??
-      (provider === "openai"
-        ? "gpt-image-2.5-flare"
-        : "fal-ai/flux-pro/kontext");
+      "gemini-3.1-flash-image";
+
+    if (!ALLOWED_MODELS.has(model)) {
+      return Response.json({ error: "Unsupported Nano Banana model." }, { status: 400 });
+    }
 
     const estimate = await buildProjectGenerationEstimate({
       projectId,
@@ -30,7 +39,11 @@ export async function POST(request: Request, context: Context) {
 
     await db.project.update({
       where: { id: projectId },
-      data: { workflowState: "READY_FOR_GENERATION" },
+      data: {
+        workflowState: "READY_FOR_GENERATION",
+        defaultImageProvider: provider,
+        defaultImageModel: model,
+      },
     });
 
     return Response.json({

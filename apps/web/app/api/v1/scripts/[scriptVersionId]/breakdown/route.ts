@@ -9,6 +9,7 @@ export async function POST(_request: Request, context: Context) {
   try {
     const user = await requireAppUser();
     const { scriptVersionId } = await context.params;
+
     const scriptVersion = await db.scriptVersion.findFirst({
       where: {
         id: scriptVersionId,
@@ -16,15 +17,25 @@ export async function POST(_request: Request, context: Context) {
       },
       include: { script: { include: { project: true } } },
     });
+
     if (!scriptVersion) throw new Error("NOT_FOUND");
 
     const project = scriptVersion.script.project;
-    const provider = "openai";
-    const model = project.defaultTextModel ?? "gpt-6-luna";
-    const idempotencyKey = `script-breakdown:${scriptVersion.id}:${model}`;
+    const provider = "google";
+    const model = project.defaultTextModel ?? "gemini-3.1-flash-lite";
+    const idempotencyKey =
+      `script-breakdown:${scriptVersion.id}:${model}`;
 
-    const existing = await db.generationJob.findUnique({ where: { idempotencyKey } });
-    if (existing) return Response.json({ job: existing }, { status: existing.status === "SUCCEEDED" ? 200 : 202 });
+    const existing = await db.generationJob.findUnique({
+      where: { idempotencyKey },
+    });
+
+    if (existing) {
+      return Response.json(
+        { job: existing },
+        { status: existing.status === "SUCCEEDED" ? 200 : 202 },
+      );
+    }
 
     const job = await db.generationJob.create({
       data: {
