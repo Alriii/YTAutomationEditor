@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, RefreshCw, Unlock } from "lucide-react";
+import { SceneImageUploader } from "@/components/media-uploader";
 
 type Asset = {
   id: string;
@@ -69,6 +70,7 @@ export function StoryboardGrid({
     });
     setBusy(undefined);
     if (!response.ok) return;
+
     setScenes((current) =>
       current.map((scene) =>
         scene.id === sceneId ? { ...scene, selectedAssetId: assetId } : scene,
@@ -85,6 +87,7 @@ export function StoryboardGrid({
     });
     setBusy(undefined);
     if (!response.ok) return;
+
     setScenes((current) =>
       current.map((item) =>
         item.id === scene.id ? { ...item, locked: !scene.locked } : item,
@@ -124,6 +127,7 @@ export function StoryboardGrid({
                   {scene.status}
                 </div>
               )}
+
               <div className="absolute left-3 top-3 rounded-md bg-black/70 px-2 py-1 text-[10px] font-semibold">
                 {String(scene.sceneNumber).padStart(3, "0")}
               </div>
@@ -135,11 +139,16 @@ export function StoryboardGrid({
             <div className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="font-medium">{scene.title || `Scene ${scene.sceneNumber}`}</h2>
+                  <h2 className="font-medium">
+                    {scene.title || `Scene ${scene.sceneNumber}`}
+                  </h2>
                   <p className="mt-1 text-xs text-white/35">
-                    {(scene.durationHintMs / 1000).toFixed(1)}s · {scene.assets.length} render{scene.assets.length === 1 ? "" : "s"}
+                    {(scene.durationHintMs / 1000).toFixed(1)}s ·{" "}
+                    {scene.assets.length} render
+                    {scene.assets.length === 1 ? "" : "s"}
                   </p>
                 </div>
+
                 <button
                   onClick={() => void toggleLock(scene)}
                   disabled={busy === scene.id}
@@ -154,6 +163,13 @@ export function StoryboardGrid({
                 {scene.visualIntent}
               </p>
 
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <SceneImageUploader projectId={projectId} sceneId={scene.id} />
+                <span className="text-[10px] text-white/25">
+                  Uploaded images join generation history.
+                </span>
+              </div>
+
               {scene.assets.length > 1 && (
                 <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
                   {scene.assets.map((asset) => (
@@ -167,7 +183,11 @@ export function StoryboardGrid({
                           : "border-white/10")
                       }
                     >
-                      <img src={asset.url} alt="" className="h-full w-full object-cover" />
+                      <img
+                        src={asset.url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
                     </button>
                   ))}
                 </div>
@@ -188,19 +208,22 @@ export function StoryboardGrid({
                 </div>
               )}
 
-              {latestJob && ["QUEUED", "RUNNING"].includes(latestJob.status) && (
-                <div className="mt-4">
-                  <div className="h-1 overflow-hidden rounded-full bg-white/10">
-                    <div
-                      className="h-full bg-violet-400 transition-all"
-                      style={{ width: `${Math.max(5, latestJob.progress)}%` }}
-                    />
+              {latestJob &&
+                ["QUEUED", "RUNNING"].includes(latestJob.status) && (
+                  <div className="mt-4">
+                    <div className="h-1 overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full bg-violet-400 transition-all"
+                        style={{
+                          width: `${Math.max(5, latestJob.progress)}%`,
+                        }}
+                      />
+                    </div>
+                    <p className="mt-2 text-[10px] uppercase tracking-wider text-white/30">
+                      {latestJob.status} · {latestJob.progress}%
+                    </p>
                   </div>
-                  <p className="mt-2 text-[10px] uppercase tracking-wider text-white/30">
-                    {latestJob.status} · {latestJob.progress}%
-                  </p>
-                </div>
-              )}
+                )}
             </div>
           </article>
         );
