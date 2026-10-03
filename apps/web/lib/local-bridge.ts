@@ -55,13 +55,11 @@ export async function proxyLocalBridge(
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
 
+  const hasBody = request.method !== "GET" && request.method !== "HEAD";
   const response = await fetch(target, {
     method: request.method,
     headers,
-    body:
-      request.method === "GET" || request.method === "HEAD"
-        ? undefined
-        : await request.text(),
+    ...(hasBody ? { body: await request.text() } : {}),
     cache: "no-store",
     signal: AbortSignal.timeout(
       bridge === "flow" && parts[0] === "generate" ? 240_000 : 15_000,
