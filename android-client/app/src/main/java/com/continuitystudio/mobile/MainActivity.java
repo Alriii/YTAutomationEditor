@@ -2,6 +2,8 @@ package com.continuitystudio.mobile;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.accounts.Account;
+import android.accounts.AccountManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -37,6 +39,9 @@ import android.widget.VideoView;
 
 import androidx.core.content.FileProvider;
 
+import com.google.android.gms.auth.GoogleAuthUtil;
+import com.google.android.gms.auth.UserRecoverableAuthException;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -57,6 +62,8 @@ public class MainActivity extends Activity {
     private static final int PICK_VOICEOVER = 8102;
     private static final int PICK_SCENE_IMAGE = 8103;
     private static final int PICK_FLOW_RESULT = 8104;
+    private static final int PICK_FLOW_ACCOUNT = 8105;
+    private static final int RECOVER_FLOW_AUTH = 8106;
 
     private static final String FLOW_PACKAGE =
         "com.google.android.apps.labs.whisk";
@@ -98,6 +105,7 @@ public class MainActivity extends Activity {
     private String activeSceneId;
     private String pendingSceneImageId;
     private String flowPendingSceneId;
+    private Account pendingFlowProbeAccount;
 
     private EditText generateNarration;
     private Spinner generateModel;
@@ -1664,6 +1672,7 @@ public class MainActivity extends Activity {
 
     private void showSettings() {
         String[] options = {
+            "Test Flow Direct access (experimental)",
             apiKeyStore.hasKey()
                 ? "Replace Gemini API key"
                 : "Add Gemini API key",
@@ -1677,18 +1686,20 @@ public class MainActivity extends Activity {
             .setTitle("Settings")
             .setItems(options, (dialog, which) -> {
                 if (which == 0) {
-                    showApiKeyDialog();
+                    startFlowDirectAccessProbe();
                 } else if (which == 1) {
-                    showMasterPromptDialog();
+                    showApiKeyDialog();
                 } else if (which == 2) {
-                    showRenameDialog();
+                    showMasterPromptDialog();
                 } else if (which == 3) {
+                    showRenameDialog();
+                } else if (which == 4) {
                     apiKeyStore.clear();
                     toast("Gemini API key cleared.");
                     if (currentScreen == SCREEN_GENERATE) {
                         showScreen(SCREEN_GENERATE);
                     }
-                } else if (which == 4) {
+                } else if (which == 5) {
                     startActivity(
                         new Intent(
                             this,
@@ -1698,6 +1709,154 @@ public class MainActivity extends Activity {
                 }
             })
             .show();
+    }
+
+    private void startFlowDirectAccessProbe() {
+        Intent chooser = AccountManager.newChooseAccountIntent(
+            null,
+            null,
+            new String[] { "com.google" },
+            "Choose the Google account you use with Flow",
+            null,
+            null,
+            null
+        );
+        startActivityForResult(chooser, PICK_FLOW_ACCOUNT);
+    }
+
+    private void runFlowDirectAccessProbe(Account account) {
+        if (account == null) {
+            toast("No Google account selected.");
+            return;
+        }
+
+        pendingFlowProbeAccount = account;
+
+        AlertDialog progressDialog =
+            new AlertDialog.Builder(this)
+                .setTitle("Testing Flow Direct")
+                .setMessage(
+                    "Requesting the aisandbox scope under Continuity Studio's own app identity…"
+                )
+                .setCancelable(false)
+                .create();
+        progressDialog.show();
+
+        executor.execute(() -> {
+            String token = null;
+            try {
+                token = GoogleAuthUtil.getToken(
+                    getApplicationContext(),
+                    account,
+                    "oauth2:" + FlowDirectProtocol.OAUTH_SCOPE
+                );
+
+                FlowDirectExperimentalClient client =
+                    new FlowDirectExperimentalClient();
+
+                FlowDirectExperimentalClient.AuthContext auth =
+                    new FlowDirectExperimentalClient.AuthContext(
+                        token,
+                        "",
+                        "0",
+                        null,
+                        null
+                    );
+
+                FlowDirectExperimentalClient.TransportResponse config =
+                    client.fetchAppConfig(auth);
+
+                FlowDirectExperimentalClient.TransportResponse models =
+                    client.fetchModels(auth);
+
+                String message =
+                    describeFlowProbeResult(
+                        config.statusCode,
+                        models.statusCode
+                    );
+
+                mainHandler.post(() -> {
+                    progressDialog.dismiss();
+                    new AlertDialog.Builder(this)
+                        .setTitle("Flow Direct access test")
+                        .setMessage(message)
+                        .setPositiveButton("OK", null)
+                        .show();
+                });
+            } catch (UserRecoverableAuthException recoverable) {
+                mainHandler.post(() -> {
+                    progressDialog.dismiss();
+                    try {
+                        startActivityForResult(
+                            recoverable.getIntent(),
+                            RECOVER_FLOW_AUTH
+                        );
+                    } catch (Exception error) {
+                        toast(
+                            "Google authorization could not be opened."
+                        );
+                    }
+                });
+            } catch (Exception error) {
+                String message =
+                    safeMessage(
+                        error,
+                        "Google did not grant Flow Direct access."
+                    );
+
+                mainHandler.post(() -> {
+                    progressDialog.dismiss();
+                    new AlertDialog.Builder(this)
+                        .setTitle("Flow Direct access test")
+                        .setMessage(
+                            "The direct-auth probe did not complete.\n\n" +
+                            message +
+                            "\n\nNo account token was stored."
+                        )
+                        .setPositiveButton("OK", null)
+                        .show();
+                });
+            } finally {
+                if (token != null && !token.isEmpty()) {
+                    try {
+                        GoogleAuthUtil.clearToken(
+                            getApplicationContext(),
+                            token
+                        );
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+        });
+    }
+
+    private String describeFlowProbeResult(
+        int configStatus,
+        int modelsStatus
+    ) {
+        if (configStatus >= 200 && configStatus < 300 &&
+            modelsStatus >= 200 && modelsStatus < 300) {
+            return
+                "Success: Google accepted Continuity Studio's own OAuth identity for Flow discovery.\n\n" +
+                "App config: HTTP " + configStatus +
+                "\nModels: HTTP " + modelsStatus +
+                "\n\nThis means direct Flow integration is technically viable. The next step is verifying the exact generation request schema and reCAPTCHA/client context.";
+        }
+
+        if (configStatus == 401 || configStatus == 403 ||
+            modelsStatus == 401 || modelsStatus == 403) {
+            return
+                "Google issued/handled the account flow, but the Flow backend rejected direct discovery under Continuity Studio's identity.\n\n" +
+                "App config: HTTP " + configStatus +
+                "\nModels: HTTP " + modelsStatus +
+                "\n\nThis usually indicates a first-party client/API-key/app-identity gate. The stable official Flow-app handoff remains available.";
+        }
+
+        return
+            "The Flow backend was reached, but discovery did not return a normal success response.\n\n" +
+            "App config: HTTP " + configStatus +
+            "\nModels: HTTP " + modelsStatus +
+            "\n\nThis can mean the HTTP method/schema still needs adjustment. No token was stored.";
     }
 
     private void showApiKeyDialog() {
@@ -1881,6 +2040,37 @@ public class MainActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
 
         if (resultCode != RESULT_OK || data == null) return;
+
+        if (requestCode == PICK_FLOW_ACCOUNT) {
+            String name =
+                data.getStringExtra(AccountManager.KEY_ACCOUNT_NAME);
+            String type =
+                data.getStringExtra(AccountManager.KEY_ACCOUNT_TYPE);
+
+            if (name == null || name.trim().isEmpty()) {
+                toast("No Google account selected.");
+                return;
+            }
+
+            if (type == null || type.trim().isEmpty()) {
+                type = "com.google";
+            }
+
+            runFlowDirectAccessProbe(
+                new Account(name, type)
+            );
+            return;
+        }
+
+        if (requestCode == RECOVER_FLOW_AUTH) {
+            Account account = pendingFlowProbeAccount;
+            if (account != null) {
+                runFlowDirectAccessProbe(account);
+            } else {
+                toast("Flow Direct authorization session expired.");
+            }
+            return;
+        }
 
         if (requestCode == PICK_REFERENCES) {
             ArrayList<Uri> uris = new ArrayList<>();

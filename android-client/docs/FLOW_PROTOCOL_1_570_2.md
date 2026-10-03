@@ -276,6 +276,36 @@ Before enabling Flow Direct in the UI:
 7. Determine whether Continuity Studio's own OAuth client can be granted the `aisandbox` scope and accepted by the backend.
 8. Only then enable direct generation.
 
+## Authentication implementation findings
+
+Additional static inspection of the Android dex shows the official app includes:
+
+- `SSOAuthPlugin`
+- `GoogleAuthUtil`
+- `GoogleAuthClient`
+- runtime text: `Using GoogleAuthUtil for getToken for 1p app`
+- runtime text: `Using GoogleAuthClient for getAccounts for 1p app`
+- the token prefix `oauth2:`
+
+Together with the observed `aisandbox` scope, this strongly suggests Flow obtains account tokens through Google Play Services as a Google first-party client.
+
+Continuity Studio now includes an **experimental access probe** that:
+
+1. lets the user choose their own Google account through Android AccountManager,
+2. asks Google Play Services for `oauth2:https://www.googleapis.com/auth/aisandbox` under Continuity Studio's own package/signing identity,
+3. tests only `flow/appConfig` and `flow/models`,
+4. never prints or persists the OAuth token,
+5. clears the temporary token after the test.
+
+The probe is diagnostic only. It does not impersonate the official Flow package or reuse extracted Google client/API credentials.
+
+Interpretation:
+
+- discovery HTTP 2xx → direct integration is likely viable under Continuity Studio's identity;
+- OAuth recovery/consent → user can explicitly authorize if Google permits the scope;
+- HTTP 401/403 → likely first-party/API-key/app-identity gate;
+- other HTTP response → endpoint method/schema needs more mapping.
+
 ## Current product policy
 
 - **Stable provider:** official Google Flow Android handoff + result import.
