@@ -25,7 +25,7 @@ apps/
   web/          Next.js 16 application, route handlers, Inngest functions
 
 packages/
-  ai/           Continuity compiler, pricing, OpenAI/fal adapters
+  ai/           Continuity compiler, Gemini scene planning, Nano Banana image adapter
   db/           Prisma schema and PostgreSQL client
   shared/       Zod schemas and shared domain types
 ```
@@ -40,7 +40,7 @@ The project intentionally starts with four workspace units. Storage and job code
 - Clerk application
 - Cloudflare R2 bucket with S3-compatible credentials
 - Inngest account or local Inngest dev server
-- OpenAI and/or fal.ai API key, supplied either by the platform or by the user through BYOK
+- Google Gemini API key, supplied either by the platform or by the user through BYOK
 
 ## Local setup
 
@@ -112,10 +112,25 @@ The application exposes the Inngest handler at:
 | `R2_BUCKET` | yes | Private object bucket |
 | `INNGEST_EVENT_KEY` | production | Inngest event key |
 | `INNGEST_SIGNING_KEY` | production | Inngest signing key |
-| `OPENAI_API_KEY` | optional | Platform OpenAI fallback |
-| `FAL_KEY` | optional | Platform fal.ai fallback |
+| `GEMINI_API_KEY` | optional | Platform Google Gemini fallback |
 
 If a creator stores a BYOK key, that encrypted user credential takes precedence over the platform fallback.
+
+## Nano Banana models
+
+The image selector exposes exactly these Google Gemini image models:
+
+| UI label | API model ID | MVP output |
+| --- | --- | --- |
+| Nano Banana 2 Lite | `gemini-3.1-flash-lite-image` | 1K |
+| Nano Banana 2 | `gemini-3.1-flash-image` | 1K |
+| Nano Banana Pro | `gemini-3-pro-image` | 1K |
+
+Nano Banana 2 is the default. The MVP keeps output at 1K for predictable cost and latency; resolution controls can be added later without changing continuity snapshots or model selection.
+
+Scene breakdown uses `gemini-3.1-flash-lite`, so one Google Gemini credential powers the complete AI path.
+
+Google currently lists no free API tier for Nano Banana 2 Lite, Nano Banana 2, or Nano Banana Pro image generation. The cost gate therefore remains mandatory before batch generation.
 
 ## Security model
 
