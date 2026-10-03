@@ -17,3 +17,7 @@ It is designed for Android 8+ and specifically tested by CI against the Android 
 No access to `/Android/data` is required.
 
 Google Flow automation and FFmpeg rendering continue to run on the PC. The Android app talks to them through Continuity Studio's local server proxy.
+
+## CI build
+
+The APK workflow locates the Android command-line SDK on the GitHub runner, installs Android 35, builds the debug APK, and uploads it as `Continuity-Studio-S23-APK`.
