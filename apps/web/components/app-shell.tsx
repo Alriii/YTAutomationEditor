@@ -6,10 +6,12 @@ import { ProjectStageNav } from "./project-stage-nav";
 export function AppShell({
   projectId,
   projectTitle,
+  localMode = false,
   children,
 }: {
   projectId?: string;
   projectTitle?: string;
+  localMode?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -31,8 +33,14 @@ export function AppShell({
                 {projectTitle}
               </div>
             )}
+            {localMode && (
+              <div className="mt-2 inline-flex rounded-full border border-emerald-300/15 bg-emerald-300/[.07] px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-emerald-200/70">
+                Local mode
+              </div>
+            )}
           </div>
-          <UserButton />
+
+          {!localMode && <UserButton />}
         </div>
 
         {projectId ? (

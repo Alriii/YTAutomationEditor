@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: continuity
+      POSTGRES_USER: continuity
+      POSTGRES_PASSWORD: continuity
+    ports:
+      - "5432:5432"
+    volumes:
+      - continuity_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U continuity -d continuity"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: continuity
+      MINIO_ROOT_PASSWORD: continuity-local-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - continuity_minio:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until /usr/bin/mc alias set local http://minio:9000 continuity continuity-local-secret; do sleep 2; done;
+      /usr/bin/mc mb --ignore-existing local/continuity;
+      exit 0;
+      "
+
+  inngest:
+    image: inngest/inngest:latest
+    command: >
+      inngest dev --no-discovery
+      -u http://host.docker.internal:3000/api/inngest
+    ports:
+      - "8288:8288"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  continuity_postgres:
+  continuity_minio:

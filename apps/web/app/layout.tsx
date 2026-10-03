@@ -4,9 +4,20 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Continuity Studio",
-  description: "Continuity-first visual production for long-form documentary creators."
+  description:
+    "Continuity-first visual production for long-form documentary creators.",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body><ClerkProvider>{children}</ClerkProvider></body></html>;
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  const localMode = process.env.LOCAL_MODE === "true";
+
+  return (
+    <html lang="en">
+      <body>
+        {localMode ? children : <ClerkProvider>{children}</ClerkProvider>}
+      </body>
+    </html>
+  );
 }

@@ -16,7 +16,11 @@
     "db:push": "pnpm --filter @continuity/db db:push",
     "db:migrate": "pnpm --filter @continuity/db db:migrate",
     "flow:bridge": "node scripts/flow-bridge.mjs",
-    "flow:install": "pnpm exec playwright install chromium"
+    "flow:install": "pnpm exec playwright install chromium",
+    "local:setup": "node scripts/setup-local.mjs",
+    "local:infra": "docker compose -f docker-compose.local.yml up -d --wait",
+    "local:down": "docker compose -f docker-compose.local.yml down",
+    "local:start": "pnpm local:setup && pnpm local:infra && pnpm db:generate && pnpm db:push"
   },
   "devDependencies": {
     "turbo": "^2.5.8",

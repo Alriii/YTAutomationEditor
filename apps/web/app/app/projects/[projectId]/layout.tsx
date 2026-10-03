@@ -12,7 +12,11 @@ export default async function ProjectLayout({
   const { project } = await requireOwnedProject(projectId);
 
   return (
-    <AppShell projectId={projectId} projectTitle={project.title}>
+    <AppShell
+      projectId={projectId}
+      projectTitle={project.title}
+      localMode={process.env.LOCAL_MODE === "true"}
+    >
       {children}
     </AppShell>
   );
