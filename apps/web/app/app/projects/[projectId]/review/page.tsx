@@ -132,6 +132,17 @@ export default async function ReviewPage({
       const fit: "cover" | "contain" =
         raw.fit === "contain" ? "contain" : "cover";
 
+      const motion =
+        raw.motion === "ZOOM_IN" ||
+        raw.motion === "ZOOM_OUT" ||
+        raw.motion === "PAN_LEFT" ||
+        raw.motion === "PAN_RIGHT" ||
+        raw.motion === "PAN_UP" ||
+        raw.motion === "PAN_DOWN"
+          ? raw.motion
+          : "NONE";
+      const transition = raw.transition === "FADE" ? "FADE" : "CUT";
+
       return {
         id: scene.id,
         sceneNumber: scene.sceneNumber,
@@ -146,6 +157,10 @@ export default async function ReviewPage({
           scale: typeof raw.scale === "number" ? raw.scale : 1,
           x: typeof raw.x === "number" ? raw.x : 0,
           y: typeof raw.y === "number" ? raw.y : 0,
+          motion,
+          transition,
+          transitionMs:
+            typeof raw.transitionMs === "number" ? raw.transitionMs : 350,
         },
       };
     }),

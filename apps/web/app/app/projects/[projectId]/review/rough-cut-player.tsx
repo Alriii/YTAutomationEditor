@@ -20,6 +20,16 @@ type FrameSettings = {
   scale: number;
   x: number;
   y: number;
+  motion:
+    | "NONE"
+    | "ZOOM_IN"
+    | "ZOOM_OUT"
+    | "PAN_LEFT"
+    | "PAN_RIGHT"
+    | "PAN_UP"
+    | "PAN_DOWN";
+  transition: "CUT" | "FADE";
+  transitionMs: number;
 };
 
 type PreviewScene = {
@@ -100,6 +110,62 @@ export function RoughCutPlayer({
     ? framing[currentScene.id] ?? currentScene.framing
     : undefined;
 
+  const sceneProgress =
+    currentScene && currentScene.endMs > currentScene.startMs
+      ? Math.min(
+          1,
+          Math.max(
+            0,
+            (currentMs - currentScene.startMs) /
+              (currentScene.endMs - currentScene.startMs),
+          ),
+        )
+      : 0;
+
+  function previewTransform(settings: FrameSettings): string {
+    let x = settings.x;
+    let y = settings.y;
+    let scale = settings.scale;
+
+    if (settings.motion === "ZOOM_IN") {
+      scale *= 1 + sceneProgress * 0.08;
+    } else if (settings.motion === "ZOOM_OUT") {
+      scale *= 1.08 - sceneProgress * 0.08;
+    } else if (settings.motion === "PAN_LEFT") {
+      x += 4 - sceneProgress * 8;
+    } else if (settings.motion === "PAN_RIGHT") {
+      x += -4 + sceneProgress * 8;
+    } else if (settings.motion === "PAN_UP") {
+      y += 4 - sceneProgress * 8;
+    } else if (settings.motion === "PAN_DOWN") {
+      y += -4 + sceneProgress * 8;
+    }
+
+    return `translate(${x}%, ${y}%) scale(${scale})`;
+  }
+
+  function previewOpacity(settings: FrameSettings): number {
+    if (
+      settings.transition !== "FADE" ||
+      !currentScene ||
+      settings.transitionMs <= 0
+    ) {
+      return 1;
+    }
+
+    const localMs = currentMs - currentScene.startMs;
+    const remainingMs = currentScene.endMs - currentMs;
+    const fadeMs = Math.min(
+      settings.transitionMs,
+      Math.max(1, (currentScene.endMs - currentScene.startMs) / 2),
+    );
+
+    return Math.max(
+      0,
+      Math.min(1, localMs / fadeMs, remainingMs / fadeMs),
+    );
+  }
+
   function updateFraming(patch: Partial<FrameSettings>) {
     if (!currentScene) return;
     setFraming((current) => ({
@@ -123,7 +189,7 @@ export function RoughCutPlayer({
       },
     );
     setFramingMessage(
-      response.ok ? "Framing saved." : "Could not save framing.",
+      response.ok ? "Scene look saved." : "Could not save scene look.",
     );
   }
 
@@ -144,6 +210,23 @@ export function RoughCutPlayer({
   function stopSilentLoop() {
     if (frameRef.current !== undefined) cancelAnimationFrame(frameRef.current);
     frameRef.current = undefined;
+  }
+
+  function runAudioLoop() {
+    stopSilentLoop();
+
+    const tick = () => {
+      const audio = audioRef.current;
+      if (!audio || audio.paused || audio.ended) {
+        frameRef.current = undefined;
+        return;
+      }
+
+      setCurrentMs(Math.round(audio.currentTime * 1000));
+      frameRef.current = requestAnimationFrame(tick);
+    };
+
+    frameRef.current = requestAnimationFrame(tick);
   }
 
   function runSilentLoop() {
@@ -218,8 +301,14 @@ export function RoughCutPlayer({
               className="h-full w-full"
               style={{
                 objectFit: currentFraming?.fit ?? "cover",
-                transform: `translate(${currentFraming?.x ?? 0}%, ${currentFraming?.y ?? 0}%) scale(${currentFraming?.scale ?? 1})`,
+                transform: currentFraming
+                  ? previewTransform(currentFraming)
+                  : "none",
+                opacity: currentFraming
+                  ? previewOpacity(currentFraming)
+                  : 1,
                 transformOrigin: "center center",
+                willChange: "transform, opacity",
               }}
             />
           ) : (
@@ -281,9 +370,18 @@ export function RoughCutPlayer({
             onTimeUpdate={(event) =>
               setCurrentMs(Math.round(event.currentTarget.currentTime * 1000))
             }
-            onPlay={() => setPlaying(true)}
-            onPause={() => setPlaying(false)}
-            onEnded={() => setPlaying(false)}
+            onPlay={() => {
+              setPlaying(true);
+              runAudioLoop();
+            }}
+            onPause={() => {
+              setPlaying(false);
+              stopSilentLoop();
+            }}
+            onEnded={() => {
+              setPlaying(false);
+              stopSilentLoop();
+            }}
           />
         )}
 
@@ -417,6 +515,65 @@ export function RoughCutPlayer({
                     className="mt-1 w-full accent-violet-400"
                   />
                 </label>
+                <div className="mt-4 grid gap-3">
+                  <label className="text-xs text-white/45">
+                    Motion
+                    <select
+                      value={currentFraming.motion}
+                      onChange={(event) =>
+                        updateFraming({
+                          motion: event.target.value as FrameSettings["motion"],
+                        })
+                      }
+                      className="mt-1 w-full rounded-lg border border-white/10 bg-[#0d111a] px-2 py-2 text-sm"
+                    >
+                      <option value="NONE">Still</option>
+                      <option value="ZOOM_IN">Slow zoom in</option>
+                      <option value="ZOOM_OUT">Slow zoom out</option>
+                      <option value="PAN_LEFT">Pan left</option>
+                      <option value="PAN_RIGHT">Pan right</option>
+                      <option value="PAN_UP">Pan up</option>
+                      <option value="PAN_DOWN">Pan down</option>
+                    </select>
+                  </label>
+
+                  <label className="text-xs text-white/45">
+                    Transition
+                    <select
+                      value={currentFraming.transition}
+                      onChange={(event) =>
+                        updateFraming({
+                          transition:
+                            event.target.value as FrameSettings["transition"],
+                        })
+                      }
+                      className="mt-1 w-full rounded-lg border border-white/10 bg-[#0d111a] px-2 py-2 text-sm"
+                    >
+                      <option value="CUT">Cut</option>
+                      <option value="FADE">Fade through black</option>
+                    </select>
+                  </label>
+
+                  {currentFraming.transition === "FADE" && (
+                    <label className="text-xs text-white/45">
+                      Fade {currentFraming.transitionMs}ms
+                      <input
+                        type="range"
+                        min={100}
+                        max={1500}
+                        step={50}
+                        value={currentFraming.transitionMs}
+                        onChange={(event) =>
+                          updateFraming({
+                            transitionMs: Number(event.target.value),
+                          })
+                        }
+                        className="mt-1 w-full accent-violet-400"
+                      />
+                    </label>
+                  )}
+                </div>
+
                 <div className="mt-3 flex gap-2">
                   <button
                     onClick={() =>
@@ -425,6 +582,9 @@ export function RoughCutPlayer({
                         scale: 1,
                         x: 0,
                         y: 0,
+                        motion: "NONE",
+                        transition: "CUT",
+                        transitionMs: 350,
                       })
                     }
                     className="rounded-lg border border-white/10 px-3 py-2 text-xs"
@@ -435,7 +595,7 @@ export function RoughCutPlayer({
                     onClick={() => void saveFraming()}
                     className="rounded-lg bg-violet-400 px-3 py-2 text-xs font-semibold text-slate-950"
                   >
-                    Save framing
+                    Save scene look
                   </button>
                 </div>
                 {framingMessage && (

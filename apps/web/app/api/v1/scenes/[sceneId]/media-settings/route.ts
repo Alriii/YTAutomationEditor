@@ -8,6 +8,17 @@ const schema = z.object({
   scale: z.number().min(0.5).max(3),
   x: z.number().min(-100).max(100),
   y: z.number().min(-100).max(100),
+  motion: z.enum([
+    "NONE",
+    "ZOOM_IN",
+    "ZOOM_OUT",
+    "PAN_LEFT",
+    "PAN_RIGHT",
+    "PAN_UP",
+    "PAN_DOWN",
+  ]),
+  transition: z.enum(["CUT", "FADE"]),
+  transitionMs: z.number().int().min(0).max(1500),
 });
 
 type Context = { params: Promise<{ sceneId: string }> };
