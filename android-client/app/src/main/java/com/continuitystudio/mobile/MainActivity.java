@@ -2,6 +2,9 @@ package com.continuitystudio.mobile;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
@@ -32,6 +35,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.VideoView;
 
+import androidx.core.content.FileProvider;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -51,6 +56,10 @@ public class MainActivity extends Activity {
     private static final int PICK_REFERENCES = 8101;
     private static final int PICK_VOICEOVER = 8102;
     private static final int PICK_SCENE_IMAGE = 8103;
+    private static final int PICK_FLOW_RESULT = 8104;
+
+    private static final String FLOW_PACKAGE =
+        "com.google.android.apps.labs.whisk";
 
     public static final String DEFAULT_MASTER =
         "Create a polished continuity-first 2D cinematic documentary illustration for technology and business history. " +
@@ -88,6 +97,7 @@ public class MainActivity extends Activity {
 
     private String activeSceneId;
     private String pendingSceneImageId;
+    private String flowPendingSceneId;
 
     private EditText generateNarration;
     private Spinner generateModel;
@@ -574,11 +584,11 @@ public class MainActivity extends Activity {
         ScrollView scroll = scrollScreen();
         LinearLayout body = screenBody();
 
-        body.addView(heading("AI Image Generation", 24));
+        body.addView(heading("Google Flow Generation", 24));
         TextView lead = text(
             activeSceneId == null
-                ? "Create a new continuity-locked visual."
-                : "Regenerate this storyboard scene without losing the rest of the project.",
+                ? "Generate through your Google Flow account and credits."
+                : "Send this storyboard scene to Flow without losing project continuity.",
             12,
             MUTED
         );
@@ -587,8 +597,9 @@ public class MainActivity extends Activity {
 
         ProjectStore.Scene active = findScene(activeSceneId);
 
-        LinearLayout modelCard = card();
-        modelCard.addView(text("MODEL", 10, MUTED));
+        LinearLayout flowCard = card();
+        flowCard.setBackgroundResource(R.drawable.bg_card_selected);
+        flowCard.addView(text("FLOW TARGET MODEL", 10, Color.rgb(206, 181, 255)));
 
         generateModel = new Spinner(this);
         generateModel.setAdapter(
@@ -603,9 +614,9 @@ public class MainActivity extends Activity {
             )
         );
         selectSpinner(generateModel, project.model);
-        modelCard.addView(generateModel, matchWrap());
+        flowCard.addView(generateModel, matchWrap());
 
-        modelCard.addView(text("FORMAT", 10, MUTED));
+        flowCard.addView(text("FORMAT", 10, Color.rgb(206, 181, 255)));
         generateAspect = new Spinner(this);
         generateAspect.setAdapter(
             new ArrayAdapter<>(
@@ -615,8 +626,16 @@ public class MainActivity extends Activity {
             )
         );
         selectSpinner(generateAspect, project.aspectRatio);
-        modelCard.addView(generateAspect, matchWrap());
-        body.addView(modelCard);
+        flowCard.addView(generateAspect, matchWrap());
+
+        TextView note = text(
+            "Continuity Studio prepares the prompt and references. Flow still owns the final model/format controls because Google does not expose Flow as a third-party generation API.",
+            11,
+            MUTED
+        );
+        note.setPadding(0, dp(8), 0, 0);
+        flowCard.addView(note);
+        body.addView(flowCard);
 
         LinearLayout promptCard = card();
         promptCard.addView(text("SCENE NARRATION", 10, MUTED));
@@ -654,13 +673,30 @@ public class MainActivity extends Activity {
         promptCard.addView(refRow);
 
         generateButton = primaryButton(
-            active == null ? "✦  Generate Scene" : "✦  Regenerate Scene"
+            active == null
+                ? "✦  Open in Google Flow"
+                : "✦  Regenerate in Google Flow"
         );
         LinearLayout.LayoutParams genParams = matchWrap();
         genParams.topMargin = dp(12);
         generateButton.setLayoutParams(genParams);
-        generateButton.setOnClickListener(v -> generateImage());
+        generateButton.setOnClickListener(v -> launchGoogleFlow());
         promptCard.addView(generateButton);
+
+        LinearLayout returnRow = horizontal();
+        returnRow.setPadding(0, dp(9), 0, 0);
+
+        Button importResult = secondaryButton("Import Flow Result");
+        importResult.setOnClickListener(v -> importFlowResult());
+
+        Button apiFallback = secondaryButton("Direct API · billed");
+        apiFallback.setOnClickListener(v -> generateImage());
+
+        LinearLayout.LayoutParams resultParams = weighted();
+        resultParams.rightMargin = dp(8);
+        returnRow.addView(importResult, resultParams);
+        returnRow.addView(apiFallback, weighted());
+        promptCard.addView(returnRow);
 
         generateProgress = new ProgressBar(this);
         generateProgress.setIndeterminate(true);
@@ -668,19 +704,16 @@ public class MainActivity extends Activity {
         promptCard.addView(generateProgress);
 
         generateStatus = text(
-            apiKeyStore.hasKey()
-                ? "Ready · output auto-saves to Downloads"
-                : "Add your Gemini API key once in Settings before generating.",
+            "Flow mode · your compiled prompt is copied automatically · no Gemini API key required",
             11,
-            apiKeyStore.hasKey() ? SUCCESS : Color.rgb(251, 191, 36)
+            SUCCESS
         );
         generateStatus.setPadding(0, dp(8), 0, 0);
         promptCard.addView(generateStatus);
-
         body.addView(promptCard);
 
         LinearLayout previewCard = card();
-        previewCard.addView(heading("Preview", 17));
+        previewCard.addView(heading("Scene Preview", 17));
 
         generatePreview = new ImageView(this);
         generatePreview.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -693,10 +726,20 @@ public class MainActivity extends Activity {
         previewParams.topMargin = dp(10);
         previewCard.addView(generatePreview, previewParams);
 
-        if (active != null && active.imagePath != null && !active.imagePath.isEmpty()) {
+        if (active != null &&
+            active.imagePath != null &&
+            !active.imagePath.isEmpty()) {
             Bitmap bitmap = BitmapFactory.decodeFile(active.imagePath);
             if (bitmap != null) generatePreview.setImageBitmap(bitmap);
         }
+
+        TextView returnHelp = text(
+            "In Flow: choose Image → confirm model/aspect → Generate → Download. Then return here and tap Import Flow Result.",
+            11,
+            MUTED
+        );
+        returnHelp.setPadding(0, dp(10), 0, 0);
+        previewCard.addView(returnHelp);
 
         body.addView(previewCard);
 
@@ -995,6 +1038,201 @@ public class MainActivity extends Activity {
 
         scroll.addView(body);
         return scroll;
+    }
+
+    private void launchGoogleFlow() {
+        String narration = generateNarration.getText().toString().trim();
+        if (narration.isEmpty()) {
+            generateNarration.setError("Paste narration or a scene idea.");
+            return;
+        }
+
+        ProjectStore.Scene scene = findScene(activeSceneId);
+        if (scene != null && scene.locked) {
+            toast("Unlock this scene first.");
+            return;
+        }
+
+        project.model = generateModel.getSelectedItem().toString();
+        project.aspectRatio = generateAspect.getSelectedItem().toString();
+
+        if (scene == null) {
+            scene = new ProjectStore.Scene();
+            project.scenes.add(scene);
+            activeSceneId = scene.id;
+        }
+
+        scene.narration = narration;
+        if (scene.subtitle == null || scene.subtitle.trim().isEmpty()) {
+            scene.subtitle = narration;
+        }
+
+        flowPendingSceneId = scene.id;
+        store.save(project);
+
+        String prompt = compilePrompt(narration);
+
+        ClipboardManager clipboard =
+            (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        clipboard.setPrimaryClip(
+            ClipData.newPlainText("Continuity Studio Flow Prompt", prompt)
+        );
+
+        ArrayList<Uri> streams = new ArrayList<>();
+        for (String path : project.references) {
+            if (streams.size() >= 8) break;
+            File file = new File(path);
+            if (!file.exists()) continue;
+
+            try {
+                streams.add(
+                    FileProvider.getUriForFile(
+                        this,
+                        getPackageName() + ".files",
+                        file
+                    )
+                );
+            } catch (Exception ignored) {
+            }
+        }
+
+        Intent handoff = new Intent(
+            streams.isEmpty()
+                ? Intent.ACTION_SEND
+                : Intent.ACTION_SEND_MULTIPLE
+        );
+        handoff.setPackage(FLOW_PACKAGE);
+        handoff.putExtra(Intent.EXTRA_TEXT, prompt);
+        handoff.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+        if (streams.isEmpty()) {
+            handoff.setType("text/plain");
+        } else {
+            handoff.setType("image/*");
+            handoff.putParcelableArrayListExtra(
+                Intent.EXTRA_STREAM,
+                streams
+            );
+
+            ClipData clip = ClipData.newUri(
+                getContentResolver(),
+                "Continuity reference",
+                streams.get(0)
+            );
+            for (int i = 1; i < streams.size(); i++) {
+                clip.addItem(new ClipData.Item(streams.get(i)));
+            }
+            handoff.setClipData(clip);
+        }
+
+        boolean launched = false;
+
+        try {
+            if (handoff.resolveActivity(getPackageManager()) != null) {
+                startActivity(handoff);
+                launched = true;
+            }
+        } catch (Exception ignored) {
+        }
+
+        if (!launched) {
+            try {
+                Intent launcher =
+                    getPackageManager()
+                        .getLaunchIntentForPackage(FLOW_PACKAGE);
+                if (launcher != null) {
+                    startActivity(launcher);
+                    launched = true;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        generateStatus.setTextColor(SUCCESS);
+
+        if (launched) {
+            generateStatus.setText(
+                "Flow opened · prompt copied · " +
+                streams.size() +
+                " reference(s) shared when supported."
+            );
+            showFlowHandoffDialog();
+            return;
+        }
+
+        generateStatus.setTextColor(Color.rgb(251, 191, 36));
+        generateStatus.setText(
+            "Google Flow app is not installed. Opening its Play Store page."
+        );
+        openFlowPlayStore();
+    }
+
+    private void showFlowHandoffDialog() {
+        new AlertDialog.Builder(this)
+            .setTitle("Continue in Google Flow")
+            .setMessage(
+                "Your continuity prompt is already copied. " +
+                "If Flow accepted Android sharing, your reference images will arrive with the handoff.\n\n" +
+                "In Flow choose Image, confirm the model and aspect ratio, generate, then Download the image. " +
+                "Return to Continuity Studio and tap Import Flow Result to attach it to this exact scene."
+            )
+            .setPositiveButton("Got it", null)
+            .setNeutralButton("Copy prompt again", (dialog, which) -> {
+                String narration =
+                    generateNarration == null
+                        ? ""
+                        : generateNarration.getText().toString().trim();
+                if (!narration.isEmpty()) {
+                    ClipboardManager clipboard =
+                        (ClipboardManager)
+                            getSystemService(Context.CLIPBOARD_SERVICE);
+                    clipboard.setPrimaryClip(
+                        ClipData.newPlainText(
+                            "Continuity Studio Flow Prompt",
+                            compilePrompt(narration)
+                        )
+                    );
+                    toast("Prompt copied.");
+                }
+            })
+            .show();
+    }
+
+    private void importFlowResult() {
+        String target =
+            flowPendingSceneId != null
+                ? flowPendingSceneId
+                : activeSceneId;
+
+        if (target == null) {
+            toast("Open a scene in Flow first so the result has a storyboard destination.");
+            return;
+        }
+
+        pendingSceneImageId = target;
+
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.setType("image/*");
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        startActivityForResult(intent, PICK_FLOW_RESULT);
+    }
+
+    private void openFlowPlayStore() {
+        try {
+            startActivity(
+                new Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse(
+                        "market://details?id=" + FLOW_PACKAGE
+                    )
+                )
+            );
+        } catch (Exception ignored) {
+            openExternal(
+                "https://play.google.com/store/apps/details?id=" +
+                FLOW_PACKAGE
+            );
+        }
     }
 
     private void generateImage() {
@@ -1713,7 +1951,8 @@ public class MainActivity extends Activity {
             return;
         }
 
-        if (requestCode == PICK_SCENE_IMAGE &&
+        if ((requestCode == PICK_SCENE_IMAGE ||
+             requestCode == PICK_FLOW_RESULT) &&
             data.getData() != null &&
             pendingSceneImageId != null) {
             Uri uri = data.getData();
@@ -1735,8 +1974,15 @@ public class MainActivity extends Activity {
                         );
                     store.save(project);
                     mainHandler.post(() -> {
-                        toast("Scene image replaced.");
-                        showScreen(SCREEN_STORYBOARD);
+                        if (requestCode == PICK_FLOW_RESULT) {
+                            activeSceneId = scene.id;
+                            flowPendingSceneId = null;
+                            toast("Flow result attached to the storyboard scene.");
+                            showScreen(SCREEN_GENERATE);
+                        } else {
+                            toast("Scene image replaced.");
+                            showScreen(SCREEN_STORYBOARD);
+                        }
                     });
                 } catch (Exception error) {
                     mainHandler.post(() ->
