@@ -32,6 +32,19 @@ jobs:
         run: |
           "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
 
+      - name: Restore stable sideload signing identity
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: continuity-studio-android-signing-v1
+
+      - name: Ensure signing identity
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v               -keystore "$HOME/.android/debug.keystore"               -storepass android               -alias androiddebugkey               -keypass android               -keyalg RSA               -keysize 2048               -validity 10000               -dname "CN=Continuity Studio Android,O=Continuity Studio,C=PH"
+          fi
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
@@ -41,13 +54,19 @@ jobs:
       - name: Build installable APK
         run: gradle -p android-client :app:assembleDebug --stacktrace
 
+      - name: Verify APK
+        run: |
+          APK="android-client/app/build/outputs/apk/debug/app-debug.apk"
+          /usr/local/lib/android/sdk/build-tools/35.0.0/apksigner verify --verbose --print-certs "$APK"
+          /usr/local/lib/android/sdk/build-tools/35.0.0/zipalign -c -v 4 "$APK"
+
       - name: Name APK
-        run: cp android-client/app/build/outputs/apk/debug/app-debug.apk Continuity-Studio-S23.apk
+        run: cp android-client/app/build/outputs/apk/debug/app-debug.apk Continuity-Studio-S23-v3.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Continuity-Studio-S23-APK
-          path: Continuity-Studio-S23.apk
+          name: Continuity-Studio-S23-v3
+          path: Continuity-Studio-S23-v3.apk
           if-no-files-found: error
           retention-days: 30
