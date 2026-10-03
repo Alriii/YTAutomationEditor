@@ -1,108 +1,241 @@
 # Continuity Studio
 
-Continuity Studio is a continuity-first SaaS for long-form faceless documentary and YouTube creators. It turns a versioned script into human-reviewed scenes, compiles locked style/cast/world constraints into each scene, estimates generation cost, runs durable image jobs, preserves render history, and exports portable scene assets.
+Continuity Studio is a continuity-first production workspace for long-form faceless YouTube and documentary creators.
 
-## MVP pipeline
+Its main job is not merely generating images. It keeps a project moving through a staged workflow while preserving visual identity across dozens of scenes.
+
+## Current workflow
 
 ```text
-Script
+Project
+  -> Script (paste or import TXT/Markdown)
+  -> Style / Master Reference
+  -> Cast
+  -> World
+  -> Voiceover (upload MP3/WAV/M4A)
   -> Scene Breakdown
   -> Human Scene Review
-  -> STRICT Continuity Compilation
-  -> Cost Estimate
-  -> Explicit Generate Action
-  -> Per-scene Image Jobs
   -> Storyboard
-  -> ZIP Export
+  -> Google Flow Generation
+  -> Captions (import SRT/VTT or auto-build from narration)
+  -> Review Player
+  -> Export
 ```
 
-Breakdown never starts image generation. Any edit to scene continuity after approval invalidates the previous estimate because the generate endpoint recomputes the continuity fingerprints and compares the estimate hash.
+Scene breakdown never starts image generation automatically.
+
+The creator must review and approve scenes first. Google Flow generation is a separate explicit stage.
+
+## Google Flow generation
+
+Continuity Studio now includes a local Flow bridge for `flow.google.com`.
+
+The bridge runs only on the creator's computer and drives a persistent Playwright browser profile. Google sign-in remains inside that local browser profile. Continuity Studio does not ask for or store the creator's Google password or Flow cookies in the database.
+
+The Flow screen currently exposes:
+
+- Nano Banana 2 Lite
+- Nano Banana 2
+- Nano Banana Pro
+
+The model labels are the Flow product labels, not Gemini API IDs.
+
+For each approved scene, Continuity Studio:
+
+1. Compiles the STRICT continuity package.
+2. Prioritizes character references, then location references, then style/master references.
+3. Creates temporary signed reference URLs.
+4. Sends the prompt, aspect ratio, model choice, and references to the local Flow bridge.
+5. The bridge opens the creator's existing Flow project.
+6. It selects Image mode and the selected Nano Banana model.
+7. It uploads reference ingredients.
+8. It submits the image prompt.
+9. It captures the generated image.
+10. Continuity Studio stores that image in the matching scene's immutable render history.
+
+### Start the local Flow bridge
+
+Install Playwright Chromium once:
+
+```bash
+pnpm flow:install
+```
+
+Then run the bridge in a second terminal:
+
+```bash
+pnpm flow:bridge
+```
+
+The bridge listens only on:
+
+```text
+http://127.0.0.1:4317
+```
+
+The default allowed web origin is:
+
+```text
+http://localhost:3000
+```
+
+The persistent browser profile is stored in:
+
+```text
+.flow-browser-profile/
+```
+
+That folder is intentionally gitignored because it may contain the creator's Google session.
+
+Flow's UI can change over time. The bridge therefore uses resilient visible-text/role selectors, but it remains a browser integration rather than a public Google API and may occasionally need selector maintenance.
+
+## Creator-owned inputs
+
+The project does not force creators to use generated material.
+
+Creators can provide their own:
+
+- Master/style reference images
+- Character reference images
+- Location reference images
+- Script
+- Voiceover
+- Subtitle file
+- Scene images
+
+Uploaded scene images join the same scene asset history as generated Flow images and can become the selected/locked render.
+
+## Voiceover
+
+The Voiceover stage accepts:
+
+- MP3
+- WAV
+- M4A
+
+The active voiceover is stored as a project track and is available in the Review player.
+
+Uploading a replacement changes the active track while older media remains in asset history.
+
+## Captions
+
+The Captions stage supports:
+
+- SRT import
+- WebVTT import
+- Editable start/end times
+- Editable text
+- Adding/removing cues
+- SRT download
+- Free first-pass caption generation from storyboard narration and scene durations
+
+The free auto-caption pass is timing-based, not speech recognition. It is intended as an editable starting point and should be checked against the voiceover.
+
+## Review player
+
+The Review stage combines:
+
+- Selected scene images
+- Scene timing
+- Master voiceover
+- Subtitle cues
+
+It provides:
+
+- Play/pause
+- Seeking
+- Scene switching
+- Subtitle overlay
+- Timeline thumbnails
+- Current narration/caption inspector
+
+This is a lightweight rough-cut review surface, not a full NLE.
 
 ## Workspace
 
 ```text
 apps/
-  web/          Next.js 16 application, route handlers, Inngest functions
+  web/          Next.js application, APIs, review UI, Inngest jobs
 
 packages/
-  ai/           Continuity compiler, Gemini scene planning, Nano Banana image adapter
+  ai/           Continuity compiler and structured scene planning
   db/           Prisma schema and PostgreSQL client
-  shared/       Zod schemas and shared domain types
-```
+  shared/       Zod schemas, subtitle parser/exporter, domain types
 
-The project intentionally starts with four workspace units. Storage and job code remain inside the web application until a separate deployment boundary is actually needed.
+scripts/
+  flow-bridge.mjs
+```
 
 ## Requirements
 
 - Node.js 24+
 - pnpm 10+
-- PostgreSQL (Neon works well)
-- Clerk application
-- Cloudflare R2 bucket with S3-compatible credentials
-- Inngest account or local Inngest dev server
-- Google Gemini API key, supplied either by the platform or by the user through BYOK
+- PostgreSQL
+- Clerk
+- Cloudflare R2 or compatible S3 storage
+- Inngest for durable server jobs
+- Chromium for the local Flow bridge
+
+A Gemini API key is optional for script-breakdown assistance. Image generation through the visible product workflow uses the local Flow bridge.
 
 ## Local setup
 
-1. Clone the repository.
+Clone and install:
 
 ```bash
 git clone git@github.com:Alriii/YTAutomationEditor.git
 cd YTAutomationEditor
-```
 
-2. Install dependencies.
-
-```bash
 corepack enable
 pnpm install
 ```
 
-3. Create local environment variables.
+Create local environment variables:
 
 ```bash
 cp .env.example .env
 ```
 
-Generate the BYOK encryption key with:
+Generate the credential-encryption key:
 
 ```bash
 openssl rand -base64 32
 ```
 
-Do not rotate `ENCRYPTION_KEY_BASE64` without a credential migration. Existing BYOK secrets are AES-256-GCM encrypted with this key.
-
-4. Generate the Prisma client and create the development schema.
+Generate Prisma and create the development schema:
 
 ```bash
 pnpm db:generate
 pnpm db:push
 ```
 
-For production, create and review a Prisma migration before deployment instead of relying on `db push`.
-
-5. Run the app.
+Run the web app:
 
 ```bash
 pnpm dev
 ```
 
-The web app is available at `http://localhost:3000`.
+For Flow generation, in another terminal:
 
-6. Run Inngest locally if you are not using the hosted dev connection.
+```bash
+pnpm flow:install
+pnpm flow:bridge
+```
 
-The application exposes the Inngest handler at:
+Open:
 
 ```text
-/api/inngest
+http://localhost:3000
 ```
+
+On first Flow use, the bridge opens a browser. Sign into Google there and create/select the Flow project you want Continuity Studio to use.
 
 ## Environment variables
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `NEXT_PUBLIC_APP_URL` | yes | Application origin |
-| `ENCRYPTION_KEY_BASE64` | yes | 32-byte AES key for BYOK credentials |
+| `ENCRYPTION_KEY_BASE64` | yes | 32-byte AES key for stored BYOK credentials |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | yes | Clerk browser key |
 | `CLERK_SECRET_KEY` | yes | Clerk server key |
 | `DATABASE_URL` | yes | PostgreSQL connection |
@@ -110,64 +243,53 @@ The application exposes the Inngest handler at:
 | `R2_ACCESS_KEY_ID` | yes | R2 S3 key |
 | `R2_SECRET_ACCESS_KEY` | yes | R2 S3 secret |
 | `R2_BUCKET` | yes | Private object bucket |
-| `INNGEST_EVENT_KEY` | production | Inngest event key |
-| `INNGEST_SIGNING_KEY` | production | Inngest signing key |
-| `GEMINI_API_KEY` | optional | Platform Google Gemini fallback |
-
-If a creator stores a BYOK key, that encrypted user credential takes precedence over the platform fallback.
-
-## Nano Banana models
-
-The image selector exposes exactly these Google Gemini image models:
-
-| UI label | API model ID | MVP output |
-| --- | --- | --- |
-| Nano Banana 2 Lite | `gemini-3.1-flash-lite-image` | 1K |
-| Nano Banana 2 | `gemini-3.1-flash-image` | 1K |
-| Nano Banana Pro | `gemini-3-pro-image` | 1K |
-
-Nano Banana 2 is the default. The MVP keeps output at 1K for predictable cost and latency; resolution controls can be added later without changing continuity snapshots or model selection.
-
-Scene breakdown uses `gemini-3.1-flash-lite`, so one Google Gemini credential powers the complete AI path.
-
-Google currently lists no free API tier for Nano Banana 2 Lite, Nano Banana 2, or Nano Banana Pro image generation. The cost gate therefore remains mandatory before batch generation.
+| `INNGEST_EVENT_KEY` | hosted Inngest | Inngest event key |
+| `INNGEST_SIGNING_KEY` | hosted Inngest | Inngest signing key |
+| `GEMINI_API_KEY` | optional | Structured script-breakdown assistance |
+| `FLOW_BRIDGE_PORT` | optional | Local bridge port, defaults to 4317 |
+| `FLOW_ALLOWED_ORIGIN` | optional | Web origin allowed to call the bridge |
+| `FLOW_PROFILE_DIR` | optional | Custom local browser-profile folder |
 
 ## Security model
 
-- All project reads and mutations are owner-scoped on the server.
-- R2 remains private. Upload and preview access use short-lived signed URLs.
-- BYOK credentials are AES-256-GCM encrypted and never returned after save.
-- Generation jobs use deterministic continuity fingerprints and idempotency keys.
-- The cost estimate is recomputed before generation. A stale estimate is rejected.
-- Platform credits use an append-only reservation/release/capture ledger.
-- Failed jobs release reserved credits.
-- Scene assets are immutable. Selecting a new render changes only the selection pointer.
-- Locked scenes are skipped by batch generation.
+- Project queries are owner-scoped on the server.
+- R2 assets remain private and use short-lived signed URLs.
+- Provider credentials are encrypted with AES-256-GCM.
+- Google Flow login stays in the local Playwright profile.
+- The Flow profile is gitignored.
+- Flow reference URLs expire.
+- Scene assets are immutable.
+- Selecting a new image changes only the selection pointer.
+- Locked scenes are skipped by automated generation passes.
+- Continuity fingerprints include provider/model/reference identity.
 
 ## Continuity Compiler
 
-The compiler assembles a generation package from:
+The STRICT compiler assembles each scene from:
 
 1. Output contract and aspect ratio
 2. Versioned Style Bible
-3. Exact CharacterVersion rows attached to the scene
-4. Exact LocationVersion attached to the scene
-5. Scene visual intent and camera/lighting notes
-6. Global negative constraints
-7. Private reference asset metadata
-8. Provider/model information used for the fingerprint
+3. Exact CharacterVersion rows
+4. Exact LocationVersion
+5. Scene visual intent
+6. Shot/camera/lighting notes
+7. Negative constraints
+8. Master/style/character/location references
+9. Provider/model identity
 
-GenerationJob stores the resulting continuity snapshot, so a running job is not affected by later edits.
+Reference ordering is intentional:
 
-## Credits
+```text
+Characters
+  -> Location
+  -> Master / Style
+```
 
-Internally, 100 credits represent roughly USD 1.00 of metered platform usage. Provider pricing is an estimate until the provider reports actual usage.
+If a generation surface limits ingredient count, identity continuity wins first.
 
-BYOK image generations reserve zero platform inference credits in the MVP. Platform-managed generations require sufficient cached balance and settle through the append-only UsageLedger.
+## Export
 
-## Export format
-
-A completed export ZIP contains:
+The current ZIP export contains normalized scene images and a manifest:
 
 ```text
 SCENE_001.jpg
@@ -176,7 +298,7 @@ SCENE_002.jpg
 manifest.json
 ```
 
-Images are normalized to JPEG during export. The manifest contains scene order, narration, start time, duration hint, and lock state.
+The in-app Review player already combines voiceover and subtitles for review. A final rendered MP4 exporter remains a later step.
 
 ## Verification
 
@@ -187,17 +309,16 @@ pnpm test
 pnpm build
 ```
 
-GitHub Actions runs generation, type checking, and tests on pushes to `main` and pull requests.
+GitHub Actions runs all four checks on `main`.
 
-## Deliberately not implemented yet
+## Not built yet
 
-- Voiceover UI
-- Video/motion models
-- CapCut/Premiere exporters
-- Full NLE timeline
+- Full professional NLE timeline
+- Final MP4 rendering
+- CapCut/Premiere project exporters
 - Team collaboration
 - Marketplace
-- Google Flow browser automation
+- Video/motion generation
 - FREE/BALANCED continuity modes
 
-These remain outside the first shippable vertical slice.
+The current target remains the staged Framesail-like production workflow with Continuity Studio's own continuity compiler and Google Flow as the image-generation surface.
