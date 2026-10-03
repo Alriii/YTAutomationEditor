@@ -29,7 +29,8 @@ jobs:
         run: yes | "$SDKMANAGER" --licenses >/dev/null || true
 
       - name: Install Android 35 SDK
-        run: "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
+        run: |
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
