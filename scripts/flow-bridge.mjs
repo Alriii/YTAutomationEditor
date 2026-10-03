@@ -12,6 +12,41 @@ const PROFILE_DIR =
 
 let contextPromise;
 
+async function firstExisting(paths) {
+  for (const candidate of paths.filter(Boolean)) {
+    try {
+      await fs.access(candidate);
+      return candidate;
+    } catch {
+      // Keep searching.
+    }
+  }
+  return undefined;
+}
+
+async function browserExecutable() {
+  if (process.env.FLOW_BROWSER_PATH) {
+    return process.env.FLOW_BROWSER_PATH;
+  }
+
+  if (process.platform !== "win32") return undefined;
+
+  const local = process.env.LOCALAPPDATA;
+  const programFiles = process.env.PROGRAMFILES;
+  const programFilesX86 = process.env["PROGRAMFILES(X86)"];
+
+  return firstExisting([
+    local && path.join(local, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"),
+    programFiles && path.join(programFiles, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"),
+    programFilesX86 && path.join(programFilesX86, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"),
+    local && path.join(local, "Google", "Chrome", "Application", "chrome.exe"),
+    programFiles && path.join(programFiles, "Google", "Chrome", "Application", "chrome.exe"),
+    programFilesX86 && path.join(programFilesX86, "Google", "Chrome", "Application", "chrome.exe"),
+    programFiles && path.join(programFiles, "Microsoft", "Edge", "Application", "msedge.exe"),
+    programFilesX86 && path.join(programFilesX86, "Microsoft", "Edge", "Application", "msedge.exe"),
+  ]);
+}
+
 function cors(origin) {
   const allowed = origin === ALLOWED_ORIGIN ? origin : ALLOWED_ORIGIN;
   return {
@@ -38,12 +73,28 @@ async function body(req) {
 
 async function launchContext() {
   if (!contextPromise) {
-    contextPromise = chromium.launchPersistentContext(PROFILE_DIR, {
-      headless: false,
-      viewport: { width: 1440, height: 1000 },
-      acceptDownloads: true,
-    });
+    contextPromise = (async () => {
+      const executablePath = await browserExecutable();
+
+      try {
+        return await chromium.launchPersistentContext(PROFILE_DIR, {
+          headless: false,
+          viewport: { width: 1440, height: 1000 },
+          acceptDownloads: true,
+          ...(executablePath ? { executablePath } : {}),
+        });
+      } catch (error) {
+        if (!executablePath) {
+          throw new Error(
+            "Could not launch Chromium. Run 'pnpm flow:install' once, or set FLOW_BROWSER_PATH to Chrome, Edge, or Brave.",
+            { cause: error },
+          );
+        }
+        throw error;
+      }
+    })();
   }
+
   return contextPromise;
 }
 
@@ -343,6 +394,7 @@ server.listen(PORT, "127.0.0.1", () => {
   console.log("Continuity Studio Flow Bridge");
   console.log(`Listening on http://127.0.0.1:${PORT}`);
   console.log(`Allowed web origin: ${ALLOWED_ORIGIN}`);
+  console.log("Browser: auto-detect Chrome / Edge / Brave, then Playwright Chromium.");
   console.log("Your Google login stays inside the local browser profile.");
   console.log("Press Ctrl+C to stop.");
   console.log("");
