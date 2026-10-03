@@ -3,6 +3,39 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+async function audioDurationMs(file: File): Promise<number | undefined> {
+  const url = URL.createObjectURL(file);
+  const audio = document.createElement("audio");
+  audio.preload = "metadata";
+
+  try {
+    return await new Promise<number | undefined>((resolve) => {
+      const timeout = window.setTimeout(() => resolve(undefined), 12000);
+
+      audio.onloadedmetadata = () => {
+        window.clearTimeout(timeout);
+        const duration = audio.duration;
+        resolve(
+          Number.isFinite(duration) && duration > 0
+            ? Math.round(duration * 1000)
+            : undefined,
+        );
+      };
+
+      audio.onerror = () => {
+        window.clearTimeout(timeout);
+        resolve(undefined);
+      };
+
+      audio.src = url;
+    });
+  } finally {
+    audio.removeAttribute("src");
+    audio.load();
+    URL.revokeObjectURL(url);
+  }
+}
+
 async function sha256(file: File): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
   return Array.from(new Uint8Array(digest))
@@ -19,6 +52,7 @@ export function VoiceoverUploader({ projectId }: { projectId: string }) {
     setBusy(true);
     setMessage(undefined);
     try {
+      const durationMs = await audioDurationMs(file);
       const response = await fetch("/api/v1/uploads/media", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -28,6 +62,7 @@ export function VoiceoverUploader({ projectId }: { projectId: string }) {
           mimeType: file.type,
           fileSizeBytes: file.size,
           sha256: await sha256(file),
+          ...(durationMs !== undefined ? { durationMs } : {}),
         }),
       });
       const body = (await response.json()) as { uploadUrl?: string; error?: string };
@@ -42,7 +77,11 @@ export function VoiceoverUploader({ projectId }: { projectId: string }) {
       });
       if (!uploaded.ok) throw new Error("Voiceover upload failed.");
 
-      setMessage("Voiceover uploaded.");
+      setMessage(
+        durationMs !== undefined
+          ? `Voiceover uploaded · ${(durationMs / 1000).toFixed(1)}s timeline.`
+          : "Voiceover uploaded. Duration could not be read automatically.",
+      );
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Upload failed.");

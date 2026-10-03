@@ -41,8 +41,13 @@ export default async function VoiceoverPage({
           <div>
             <h2 className="font-medium">Master narration</h2>
             <p className="mt-1 text-xs text-white/35">
-              MP3, WAV, or M4A. Uploading a replacement keeps old assets in project history but changes the active voiceover track.
+              MP3, WAV, or M4A. Uploading a replacement keeps old assets in project history, changes the active track, and fits scene timing to the new narration duration.
             </p>
+            {track?.asset?.durationMs && (
+              <p className="mt-2 font-mono text-xs text-violet-200/70">
+                Timeline duration: {(track.asset.durationMs / 1000).toFixed(2)}s
+              </p>
+            )}
           </div>
           <VoiceoverUploader projectId={projectId} />
         </div>

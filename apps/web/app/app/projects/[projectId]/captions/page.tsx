@@ -77,7 +77,7 @@ export default async function CaptionsPage({
   const { projectId } = await params;
   await requireOwnedProject(projectId);
 
-  const [cues, scenes, track] = await Promise.all([
+  const [cues, scenes, track, voiceTrack] = await Promise.all([
     db.subtitleCue.findMany({
       where: { projectId },
       orderBy: [{ startMs: "asc" }, { order: "asc" }],
@@ -100,6 +100,15 @@ export default async function CaptionsPage({
       },
       select: { settings: true },
     }),
+    db.projectTrack.findUnique({
+      where: {
+        projectId_type: {
+          projectId,
+          type: "VOICEOVER",
+        },
+      },
+      include: { asset: { select: { durationMs: true } } },
+    }),
   ]);
 
   return (
@@ -120,6 +129,7 @@ export default async function CaptionsPage({
           text: cue.text,
         }))}
         initialStyle={subtitleStyle(track?.settings)}
+        voiceoverDurationMs={voiceTrack?.asset?.durationMs ?? null}
         scenes={scenes.map((scene) => ({
           sceneNumber: scene.sceneNumber,
           narration: scene.narration,

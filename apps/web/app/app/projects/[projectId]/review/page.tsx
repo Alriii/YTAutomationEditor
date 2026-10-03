@@ -1,4 +1,5 @@
 import { db } from "@continuity/db";
+import { fitDurationsToTotal } from "@continuity/shared";
 import { requireOwnedProject } from "@/lib/auth";
 import { signR2Get } from "@/lib/storage/r2";
 import { RoughCutPlayer } from "./rough-cut-player";
@@ -120,8 +121,14 @@ export default async function ReviewPage({
     }),
   ]);
 
+  const fittedSceneDurations = fitDurationsToTotal(
+    scenes.map((scene) => scene.durationHintMs ?? 4500),
+    voiceTrack?.asset?.durationMs ?? null,
+    500,
+  );
+
   const preparedScenes = await Promise.all(
-    scenes.map(async (scene) => {
+    scenes.map(async (scene, sceneIndex) => {
       const raw =
         scene.mediaSettings &&
         typeof scene.mediaSettings === "object" &&
@@ -157,7 +164,8 @@ export default async function ReviewPage({
         sceneNumber: scene.sceneNumber,
         title: scene.title ?? "",
         narration: scene.narration,
-        durationMs: scene.durationHintMs ?? 4500,
+        durationMs:
+          fittedSceneDurations[sceneIndex] ?? scene.durationHintMs ?? 4500,
         imageUrl: scene.selectedAsset
           ? await signR2Get(scene.selectedAsset.storageKey, 1800)
           : null,

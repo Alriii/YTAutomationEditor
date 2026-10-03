@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { parseSubtitleText, toSrt, type SubtitleCueInput } from "@continuity/shared";
+import {
+  fitDurationsToTotal,
+  parseSubtitleText,
+  toSrt,
+  type SubtitleCueInput,
+} from "@continuity/shared";
 
 export type CaptionStyle = {
   preset: "DOCUMENTARY" | "SHORTS" | "MINIMAL" | "CUSTOM";
@@ -65,11 +70,13 @@ export function CaptionEditor({
   projectId,
   initialCues,
   initialStyle,
+  voiceoverDurationMs,
   scenes,
 }: {
   projectId: string;
   initialCues: SubtitleCueInput[];
   initialStyle: CaptionStyle;
+  voiceoverDurationMs: number | null;
   scenes: Array<{
     sceneNumber: number;
     narration: string;
@@ -118,11 +125,17 @@ export function CaptionEditor({
   function buildFromScenes() {
     let cursor = 0;
     const generated: SubtitleCueInput[] = [];
+    const fittedDurations = fitDurationsToTotal(
+      scenes.map((scene) => scene.durationMs),
+      voiceoverDurationMs,
+      500,
+    );
 
-    for (const scene of scenes) {
+    for (const [sceneIndex, scene] of scenes.entries()) {
+      const sceneDurationMs = fittedDurations[sceneIndex] ?? scene.durationMs;
       const words = scene.narration.trim().split(/\s+/).filter(Boolean);
       if (!words.length) {
-        cursor += scene.durationMs;
+        cursor += sceneDurationMs;
         continue;
       }
 
@@ -132,13 +145,13 @@ export function CaptionEditor({
         chunks.push(words.slice(index, index + chunkSize).join(" "));
       }
 
-      const cueDuration = Math.max(400, scene.durationMs / chunks.length);
+      const cueDuration = Math.max(100, sceneDurationMs / chunks.length);
 
       chunks.forEach((text, index) => {
         const startMs = Math.round(cursor + index * cueDuration);
         const endMs =
           index === chunks.length - 1
-            ? cursor + scene.durationMs
+            ? cursor + sceneDurationMs
             : Math.round(cursor + (index + 1) * cueDuration);
 
         generated.push({
@@ -149,12 +162,14 @@ export function CaptionEditor({
         });
       });
 
-      cursor += scene.durationMs;
+      cursor += sceneDurationMs;
     }
 
     setCues(generated);
     setMessage(
-      `Built ${generated.length} editable cues from storyboard timing. Review them against the voiceover before export.`,
+      voiceoverDurationMs
+        ? `Built ${generated.length} editable cues fitted to the ${(voiceoverDurationMs / 1000).toFixed(1)}s voiceover. Review phrase boundaries before export.`
+        : `Built ${generated.length} editable cues from storyboard timing. Review them against the voiceover before export.`,
     );
   }
 

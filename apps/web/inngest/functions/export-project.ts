@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import { db } from "@continuity/db";
-import { toSrt } from "@continuity/shared";
+import { fitDurationsToTotal, toSrt } from "@continuity/shared";
 import { inngest } from "../client";
 import { createZip } from "@/lib/export/zip";
 import { getR2Object, putR2Object } from "@/lib/storage/r2";
@@ -115,6 +115,7 @@ export const exportProjectFunction = inngest.createFunction(
           ? {
               storageKey: voiceTrack.asset.storageKey,
               mimeType: voiceTrack.asset.mimeType,
+              durationMs: voiceTrack.asset.durationMs,
             }
           : null,
         subtitleSettings: subtitleTrack?.settings ?? null,
@@ -137,10 +138,17 @@ export const exportProjectFunction = inngest.createFunction(
 
     const built = await step.run("build-export-zip", async () => {
       let cursorMs = 0;
+      const fittedDurations = fitDurationsToTotal(
+        data.scenes.map((scene) => scene.durationMs),
+        data.voiceover?.durationMs ?? null,
+        500,
+      );
       const files: Array<{ name: string; bytes: Buffer }> = [];
       const manifestScenes = [];
 
-      for (const scene of data.scenes) {
+      for (const [sceneIndex, scene] of data.scenes.entries()) {
+        const durationMs =
+          fittedDurations[sceneIndex] ?? scene.durationMs;
         const source = await getR2Object(scene.storageKey);
         const jpeg = await sharp(source)
           .rotate()
@@ -153,12 +161,12 @@ export const exportProjectFunction = inngest.createFunction(
           number: scene.number,
           file: filename,
           startMs: cursorMs,
-          durationMs: scene.durationMs,
+          durationMs,
           narration: scene.narration,
           locked: scene.locked,
           mediaSettings: scene.mediaSettings,
         });
-        cursorMs += scene.durationMs;
+        cursorMs += durationMs;
       }
 
       let voiceoverFile = null;

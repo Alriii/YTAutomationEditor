@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { db } from "@continuity/db";
+import { fitDurationsToTotal } from "@continuity/shared";
 import { requireAppUser } from "@/lib/auth";
 import { errorResponse } from "@/lib/http";
 import { signR2Put } from "@/lib/storage/r2";
@@ -18,6 +19,7 @@ const schema = z.discriminatedUnion("kind", [
     ]),
     fileSizeBytes: z.number().int().positive().max(500 * 1024 * 1024),
     sha256: z.string().regex(/^[a-f0-9]{64}$/i),
+    durationMs: z.number().int().positive().max(24 * 60 * 60 * 1000).optional(),
   }),
   z.object({
     kind: z.literal("scene-image"),
@@ -101,23 +103,70 @@ export async function POST(request: Request) {
         mimeType: input.mimeType,
         fileSizeBytes: BigInt(input.fileSizeBytes),
         sha256: input.sha256.toLowerCase(),
+        durationMs: input.durationMs ?? null,
       },
       select: { id: true, storageKey: true, mimeType: true },
     });
 
-    await db.projectTrack.upsert({
-      where: {
-        projectId_type: {
+    const scenes = await db.scene.findMany({
+      where: { projectId: input.projectId },
+      orderBy: { sceneNumber: "asc" },
+      select: { id: true, durationHintMs: true },
+    });
+    const fittedDurations =
+      input.durationMs !== undefined
+        ? fitDurationsToTotal(
+            scenes.map((scene) => scene.durationHintMs ?? 4500),
+            input.durationMs,
+            500,
+          )
+        : [];
+
+    await db.$transaction(async (tx) => {
+      await tx.projectTrack.upsert({
+        where: {
+          projectId_type: {
+            projectId: input.projectId,
+            type: "VOICEOVER",
+          },
+        },
+        update: {
+          assetId: asset.id,
+          settings: {
+            source: "uploaded",
+            ...(input.durationMs !== undefined
+              ? { durationMs: input.durationMs }
+              : {}),
+          },
+        },
+        create: {
           projectId: input.projectId,
           type: "VOICEOVER",
+          assetId: asset.id,
+          settings: {
+            source: "uploaded",
+            ...(input.durationMs !== undefined
+              ? { durationMs: input.durationMs }
+              : {}),
+          },
         },
-      },
-      update: { assetId: asset.id },
-      create: {
-        projectId: input.projectId,
-        type: "VOICEOVER",
-        assetId: asset.id,
-      },
+      });
+
+      if (input.durationMs !== undefined) {
+        await tx.project.update({
+          where: { id: input.projectId },
+          data: {
+            targetDurationSec: Math.max(1, Math.round(input.durationMs / 1000)),
+          },
+        });
+
+        for (const [index, scene] of scenes.entries()) {
+          await tx.scene.update({
+            where: { id: scene.id },
+            data: { durationHintMs: fittedDurations[index]! },
+          });
+        }
+      }
     });
 
     return Response.json({
