@@ -177,10 +177,19 @@ public final class GeminiImageClient {
         }
 
         if (status == 401 || status == 403) {
-            return "API key rejected. Check your Gemini API key and billing.";
+            return "API key rejected. Check that the key belongs to the Gemini project you want to use.";
         }
         if (status == 429) {
-            return "Google quota/rate limit reached. Try again later.";
+            String lower = response == null ? "" : response.toLowerCase();
+            if (
+                lower.contains("free tier") &&
+                (lower.contains("limit: 0") ||
+                 lower.contains("\"limit\":0") ||
+                 lower.contains("quota_limit_value"))
+            ) {
+                return "FREE_TIER_IMAGE_DISABLED";
+            }
+            return "Google image quota is temporarily exhausted. Check your Gemini API quota/billing.";
         }
 
         return "Google generation failed (HTTP " + status + ").";
