@@ -1091,14 +1091,60 @@ public class MainActivity extends Activity {
                 mainHandler.post(() -> {
                     generateProgress.setVisibility(View.GONE);
                     generateButton.setEnabled(true);
+
+                    String message =
+                        safeMessage(
+                            error,
+                            "Unknown generation error."
+                        );
+
+                    if ("FREE_TIER_IMAGE_DISABLED".equals(message)) {
+                        generateStatus.setTextColor(
+                            Color.rgb(251, 191, 36)
+                        );
+                        generateStatus.setText(
+                            "Google API free tier has no image-generation quota."
+                        );
+                        showFreeTierImageDialog();
+                        return;
+                    }
+
                     generateStatus.setTextColor(DANGER);
                     generateStatus.setText(
-                        "Generation failed: " +
-                        safeMessage(error, "Unknown generation error.")
+                        "Generation failed: " + message
                     );
                 });
             }
         });
+    }
+
+    private void showFreeTierImageDialog() {
+        new AlertDialog.Builder(this)
+            .setTitle("Google free tier cannot generate images")
+            .setMessage(
+                "Your API key is working, but Google currently gives Nano Banana image models a free-tier quota of 0. " +
+                "Waiting or retrying will not fix this.\n\n" +
+                "You can enable Gemini API billing, switch to the cheaper Nano Banana 2 Lite model after billing is active, " +
+                "or open Google Flow in your browser and use your Flow credits manually."
+            )
+            .setPositiveButton("Enable API billing", (dialog, which) ->
+                openExternal("https://aistudio.google.com/app/apikey")
+            )
+            .setNeutralButton("Use Nano Banana 2 Lite", (dialog, which) -> {
+                if (generateModel != null) {
+                    selectSpinner(generateModel, "Nano Banana 2 Lite");
+                    project.model = "Nano Banana 2 Lite";
+                    store.save(project);
+                    generateStatus.setTextColor(MUTED);
+                    generateStatus.setText(
+                        "Nano Banana 2 Lite selected. Billing is still required for API image generation."
+                    );
+                }
+            })
+            .setNegativeButton("Open Flow", (dialog, which) ->
+                openExternal("https://flow.google.com/")
+            )
+            .show();
     }
 
     private String compilePrompt(String narration) {
