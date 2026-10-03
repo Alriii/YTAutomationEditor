@@ -136,7 +136,8 @@ public final class VideoRenderer {
                 "-map 0:v:0 " +
                 (hasVoiceover ? "-map 1:a:0 -c:a aac -b:a 160k -shortest " : "-an ");
 
-            String tail =
+            final String finalCommon = common;
+            final String finalTail =
                 "-vf " + shellQuote(vf) +
                 " -r 30 -pix_fmt yuv420p " +
                 mappings +
@@ -144,10 +145,10 @@ public final class VideoRenderer {
                 shellQuote(output.getAbsolutePath());
 
             String hardware =
-                common +
+                finalCommon +
                 "-c:v h264_mediacodec -b:v " +
                 ("720p".equals(quality) ? "5M " : "10M ") +
-                tail;
+                finalTail;
 
             FFmpegKit.executeAsync(hardware, session -> {
                 if (ReturnCode.isSuccess(session.getReturnCode())) {
@@ -156,9 +157,9 @@ public final class VideoRenderer {
                 }
 
                 String fallback =
-                    common +
+                    finalCommon +
                     "-c:v mpeg4 -q:v 3 " +
-                    tail;
+                    finalTail;
 
                 FFmpegKit.executeAsync(fallback, fallbackSession -> {
                     if (ReturnCode.isSuccess(fallbackSession.getReturnCode())) {
