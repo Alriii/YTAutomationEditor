@@ -1,10 +1,8 @@
-import { FalImageProvider } from "./fal";
-import { OpenAIImageProvider } from "./openai";
+import { GeminiImageProvider } from "./gemini";
 import type { ImageProvider } from "./types";
 
 const providers: Record<string, ImageProvider> = {
-  openai: new OpenAIImageProvider(),
-  fal: new FalImageProvider(),
+  google: new GeminiImageProvider(),
 };
 
 export function getImageProvider(providerId: string): ImageProvider {

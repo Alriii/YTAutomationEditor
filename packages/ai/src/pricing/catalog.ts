@@ -9,9 +9,21 @@ type PricingRule = {
 };
 
 const RULES: PricingRule[] = [
-  { provider: "openai", model: "gpt-image-2.5-flare", estimatedUsdPerImage: 0.06 },
-  { provider: "openai", model: "gpt-image-2.5-sunburst", estimatedUsdPerImage: 0.09 },
-  { provider: "fal", model: "fal-ai/flux-pro/kontext", estimatedUsdPerImage: 0.05 },
+  {
+    provider: "google",
+    model: "gemini-3.1-flash-lite-image",
+    estimatedUsdPerImage: 0.0336,
+  },
+  {
+    provider: "google",
+    model: "gemini-3.1-flash-image",
+    estimatedUsdPerImage: 0.067,
+  },
+  {
+    provider: "google",
+    model: "gemini-3-pro-image",
+    estimatedUsdPerImage: 0.134,
+  },
 ];
 
 export function estimateImageCost(
@@ -21,7 +33,8 @@ export function estimateImageCost(
   const exact = RULES.find(
     (rule) => rule.provider === provider && rule.model === request.model,
   );
-  const estimatedUsd = exact?.estimatedUsdPerImage ?? (provider === "fal" ? 0.06 : 0.08);
+
+  const estimatedUsd = exact?.estimatedUsdPerImage ?? 0.067;
   return {
     estimatedUsd,
     estimatedCredits: Math.ceil(estimatedUsd / CREDIT_USD),
