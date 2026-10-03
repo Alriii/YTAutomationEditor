@@ -101,18 +101,54 @@ export async function POST(request: Request) {
         `users/${user.id}/projects/${input.projectId}/scenes/` +
         `${String(scene.sceneNumber).padStart(3, "0")}/${sourcePrefix}-${randomUUID()}.${extension}`;
 
+      let provenance:
+        | {
+            provider: "flow.google.com";
+            model: "Nano Banana 2 Lite" | "Nano Banana 2" | "Nano Banana Pro";
+            sourcePrompt: string;
+            continuityFingerprint: string;
+          }
+        | {
+            provider: "manual";
+            model: "uploaded";
+            sourcePrompt: null;
+            continuityFingerprint: null;
+          };
+
+      if (input.source === "flow") {
+        if (
+          !input.model ||
+          !input.sourcePrompt ||
+          !input.continuityFingerprint
+        ) {
+          return Response.json(
+            { error: "Flow render provenance is incomplete." },
+            { status: 400 },
+          );
+        }
+
+        provenance = {
+          provider: "flow.google.com",
+          model: input.model,
+          sourcePrompt: input.sourcePrompt,
+          continuityFingerprint: input.continuityFingerprint,
+        };
+      } else {
+        provenance = {
+          provider: "manual",
+          model: "uploaded",
+          sourcePrompt: null,
+          continuityFingerprint: null,
+        };
+      }
+
       const asset = await db.asset.create({
         data: {
           projectId: input.projectId,
           sceneId: scene.id,
           type: "IMAGE",
           role: "SCENE_RENDER",
-          provider: input.source === "flow" ? "flow.google.com" : "manual",
-          model: input.source === "flow" ? input.model : "uploaded",
-          sourcePrompt:
-            input.source === "flow" ? input.sourcePrompt : null,
-          continuityFingerprint:
-            input.source === "flow" ? input.continuityFingerprint : null,
+          ...provenance,
           storageKey,
           mimeType: input.mimeType,
           fileSizeBytes: BigInt(input.fileSizeBytes),
