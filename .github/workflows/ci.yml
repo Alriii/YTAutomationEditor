@@ -31,6 +31,7 @@ jobs:
       - run: node --check scripts/render-bridge.mjs
       - run: node --check scripts/setup-local.mjs
       - run: node --check scripts/local-dev.mjs
+      - run: bash -n start-continuity.sh
       - run: docker compose -f docker-compose.local.yml config
       - run: docker compose -f docker-compose.local.yml build renderer
       - run: pnpm test

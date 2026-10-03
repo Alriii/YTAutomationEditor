@@ -61,6 +61,14 @@ Start the complete free local app with one command:
 pnpm local:dev
 ```
 
+On Windows, you can instead double-click:
+
+```text
+START_CONTINUITY.cmd
+```
+
+It checks Node/Docker, installs dependencies when needed, then launches the same free local stack. macOS/Linux users can run `./start-continuity.sh`.
+
 On the first run it prepares the local infrastructure automatically. On later runs it reuses the saved database/storage volumes and starts only missing app processes.
 
 The launcher starts or reuses:
