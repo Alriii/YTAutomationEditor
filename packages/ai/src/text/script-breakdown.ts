@@ -99,6 +99,149 @@ const sceneSchema = {
   required: ["scenes"],
 } as const;
 
+
+function wordCount(value: string): number {
+  return value.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function sceneTitle(narration: string, sceneNumber: number): string {
+  const words = narration
+    .replace(/[“”"']/g, "")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 7)
+    .join(" ");
+
+  return words ? words.replace(/[.,;:!?]+$/, "") : `Scene ${sceneNumber}`;
+}
+
+function scriptChunks(script: string): string[] {
+  const paragraphs = script
+    .replace(/\r/g, "")
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  const chunks: string[] = [];
+
+  for (const paragraph of paragraphs) {
+    const words = paragraph.split(/\s+/);
+    let current: string[] = [];
+
+    for (const word of words) {
+      current.push(word);
+      const sentenceEnd = /[.!?][”"'’)]?$/.test(word);
+
+      if (
+        (current.length >= 16 && sentenceEnd) ||
+        current.length >= 24
+      ) {
+        chunks.push(current.join(" "));
+        current = [];
+      }
+    }
+
+    if (current.length) {
+      if (
+        current.length < 7 &&
+        chunks.length > 0 &&
+        wordCount(chunks[chunks.length - 1]!) < 30
+      ) {
+        chunks[chunks.length - 1] =
+          `${chunks[chunks.length - 1]} ${current.join(" ")}`;
+      } else {
+        chunks.push(current.join(" "));
+      }
+    }
+  }
+
+  return chunks.slice(0, 200);
+}
+
+function matchingIds(
+  narration: string,
+  entries: Array<{ id: string; name: string }>,
+): string[] {
+  const haystack = narration.toLocaleLowerCase();
+  return entries
+    .filter((entry) =>
+      haystack.includes(entry.name.toLocaleLowerCase()),
+    )
+    .map((entry) => entry.id);
+}
+
+export function breakDownScriptLocally(input: {
+  projectTitle: string;
+  script: string;
+  targetDurationSec?: number;
+  characters: BreakdownCharacter[];
+  locations: BreakdownLocation[];
+}): ScriptBreakdownResult {
+  const chunks = scriptChunks(input.script);
+  if (!chunks.length) {
+    throw new Error("Script is empty.");
+  }
+
+  const shotCycle = [
+    "medium documentary shot",
+    "close-up detail",
+    "wide environmental shot",
+    "three-quarter documentary composition",
+  ] as const;
+
+  const rawDurations = chunks.map((narration) =>
+    Math.round(
+      Math.min(12, Math.max(3.5, wordCount(narration) / 2.5)) * 1000,
+    ),
+  );
+
+  const rawTotalMs = rawDurations.reduce((sum, value) => sum + value, 0);
+  const requestedMs =
+    input.targetDurationSec !== undefined
+      ? input.targetDurationSec * 1000
+      : undefined;
+  const durationScale =
+    requestedMs && rawTotalMs > 0 ? requestedMs / rawTotalMs : 1;
+
+  const scenes = chunks.map((narration, index): ScriptBreakdownScene => {
+    const sceneNumber = index + 1;
+    const characterIds = matchingIds(narration, input.characters);
+    const locationIds = matchingIds(narration, input.locations);
+    const durationHintMs = Math.round(
+      Math.min(
+        20_000,
+        Math.max(2_500, rawDurations[index]! * durationScale),
+      ),
+    );
+
+    const literalExcerpt =
+      narration.length > 280
+        ? `${narration.slice(0, 277).trimEnd()}...`
+        : narration;
+
+    return {
+      sceneNumber,
+      title: sceneTitle(narration, sceneNumber),
+      narration,
+      visualIntent:
+        `Create a concrete documentary visual that directly represents this exact narration while preserving historical and visual continuity: ${literalExcerpt}`,
+      action:
+        "Depict the specific event, object, person, or environment described in the narration.",
+      shotType: shotCycle[index % shotCycle.length]!,
+      camera: "Natural documentary composition with a clear primary subject.",
+      lighting: "Motivated lighting consistent with the project's Style Bible and era.",
+      durationHintMs,
+      characterIds,
+      locationId: locationIds[0] ?? "",
+      continuityNotes: [
+        "Local free breakdown: verify the visual intent, cast, location, era, and factual details before approval.",
+      ],
+    };
+  });
+
+  return { scenes };
+}
+
 export async function breakDownScriptWithGemini(input: {
   apiKey: string;
   model: string;

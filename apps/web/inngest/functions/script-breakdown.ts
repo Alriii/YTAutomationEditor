@@ -1,4 +1,7 @@
-import { breakDownScriptWithGemini } from "@continuity/ai";
+import {
+  breakDownScriptLocally,
+  breakDownScriptWithGemini,
+} from "@continuity/ai";
 import { db } from "@continuity/db";
 import { inngest } from "../client";
 import { getProviderApiKey } from "@/lib/providers/credentials";
@@ -75,6 +78,7 @@ export const scriptBreakdownFunction = inngest.createFunction(
         projectId: job.projectId,
         projectTitle: job.project.title,
         aspectRatio: job.project.aspectRatio,
+        provider: job.provider,
         model: job.model,
         script: scriptVersion.content,
         scriptVersionId: scriptVersion.id,
@@ -97,6 +101,18 @@ export const scriptBreakdownFunction = inngest.createFunction(
     });
 
     const breakdown = await step.run("generate-breakdown", async () => {
+      if (snapshot.provider === "local") {
+        return breakDownScriptLocally({
+          projectTitle: snapshot.projectTitle,
+          script: snapshot.script,
+          characters: snapshot.characters,
+          locations: snapshot.locations,
+          ...(snapshot.targetDurationSec !== undefined
+            ? { targetDurationSec: snapshot.targetDurationSec }
+            : {}),
+        });
+      }
+
       const apiKey = await getProviderApiKey(snapshot.userId, "google");
 
       return breakDownScriptWithGemini({

@@ -1,5 +1,5 @@
 import { db } from "@continuity/db";
-import { requireAppUser } from "@/lib/auth";
+import { isLocalMode, requireAppUser } from "@/lib/auth";
 import { errorResponse } from "@/lib/http";
 import { inngest } from "@/inngest/client";
 
@@ -21,8 +21,23 @@ export async function POST(_request: Request, context: Context) {
     if (!scriptVersion) throw new Error("NOT_FOUND");
 
     const project = scriptVersion.script.project;
-    const provider = "google";
-    const model = project.defaultTextModel ?? "gemini-3.1-flash-lite";
+    const storedGoogleCredential = await db.providerCredential.findUnique({
+      where: {
+        userId_provider: {
+          userId: user.id,
+          provider: "google",
+        },
+      },
+      select: { status: true },
+    });
+    const hasGoogle =
+      Boolean(process.env.GEMINI_API_KEY) ||
+      storedGoogleCredential?.status === "ACTIVE";
+    const provider = isLocalMode() && !hasGoogle ? "local" : "google";
+    const model =
+      provider === "local"
+        ? "heuristic-v1"
+        : project.defaultTextModel ?? "gemini-3.1-flash-lite";
     const idempotencyKey =
       `script-breakdown:${scriptVersion.id}:${model}`;
 
