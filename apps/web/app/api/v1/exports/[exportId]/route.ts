@@ -16,6 +16,7 @@ export async function GET(_request: Request, context: Context) {
       },
       select: {
         id: true,
+        type: true,
         status: true,
         storageKey: true,
         createdAt: true,
