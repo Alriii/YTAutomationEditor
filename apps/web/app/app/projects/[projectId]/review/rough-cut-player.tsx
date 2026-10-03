@@ -37,11 +37,11 @@ export function RoughCutPlayer({
   cues: SubtitleCueInput[];
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const frameRef = useRef<number>();
+  const frameRef = useRef<number | undefined>(undefined);
   const [currentMs, setCurrentMs] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [audioDurationMs, setAudioDurationMs] = useState<number>();
-  const silentStartRef = useRef<{ clock: number; position: number }>();
+  const silentStartRef = useRef<{ clock: number; position: number } | undefined>(undefined);
 
   const timedScenes = useMemo<TimedScene[]>(() => {
     let cursor = 0;
