@@ -1,0 +1,84 @@
+import { db } from "@continuity/db";
+import { requireOwnedProject } from "@/lib/auth";
+import { signR2Get } from "@/lib/storage/r2";
+import { RoughCutPlayer } from "./rough-cut-player";
+
+export default async function ReviewPage({
+  params,
+}: {
+  params: Promise<{ projectId: string }>;
+}) {
+  const { projectId } = await params;
+  const { project } = await requireOwnedProject(projectId);
+
+  const [scenes, cues, voiceTrack] = await Promise.all([
+    db.scene.findMany({
+      where: { projectId },
+      orderBy: { sceneNumber: "asc" },
+      include: {
+        selectedAsset: {
+          select: {
+            id: true,
+            storageKey: true,
+            mimeType: true,
+          },
+        },
+      },
+    }),
+    db.subtitleCue.findMany({
+      where: { projectId },
+      orderBy: [{ startMs: "asc" }, { order: "asc" }],
+    }),
+    db.projectTrack.findUnique({
+      where: {
+        projectId_type: {
+          projectId,
+          type: "VOICEOVER",
+        },
+      },
+      include: { asset: true },
+    }),
+  ]);
+
+  const preparedScenes = await Promise.all(
+    scenes.map(async (scene) => ({
+      id: scene.id,
+      sceneNumber: scene.sceneNumber,
+      title: scene.title ?? "",
+      narration: scene.narration,
+      durationMs: scene.durationHintMs ?? 4500,
+      imageUrl: scene.selectedAsset
+        ? await signR2Get(scene.selectedAsset.storageKey, 1800)
+        : null,
+    })),
+  );
+
+  const voiceUrl =
+    voiceTrack?.asset?.storageKey
+      ? await signR2Get(voiceTrack.asset.storageKey, 1800)
+      : null;
+
+  return (
+    <div className="mx-auto max-w-7xl">
+      <div className="text-xs uppercase tracking-[.18em] text-violet-300">
+        Final review
+      </div>
+      <h1 className="mt-2 text-3xl font-semibold">Review player</h1>
+      <p className="mt-2 max-w-3xl text-sm text-white/45">
+        Review the selected scene images, master voiceover, and editable captions together before export.
+      </p>
+
+      <RoughCutPlayer
+        aspectRatio={project.aspectRatio}
+        voiceUrl={voiceUrl}
+        scenes={preparedScenes}
+        cues={cues.map((cue) => ({
+          order: cue.order,
+          startMs: cue.startMs,
+          endMs: cue.endMs,
+          text: cue.text,
+        }))}
+      />
+    </div>
+  );
+}
