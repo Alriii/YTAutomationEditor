@@ -339,6 +339,7 @@ model Scene {
   voiceStartMs       Int?
   voiceEndMs         Int?
   promptOverride     String?
+  mediaSettings      Json?
   continuityNotes    String[]     @default([])
   status             SceneStatus  @default(DRAFT)
   approvedAt         DateTime?
