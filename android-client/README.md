@@ -1,23 +1,43 @@
-# Continuity Studio Android client
+# Continuity Studio Android
 
-This is the native Android shell for Continuity Studio.
+The Android app is now standalone for Nano Banana image generation.
 
-It is designed for Android 8+ and specifically tested by CI against the Android 35 SDK. The full production backend still runs on the creator's PC.
+## Prefilled defaults
 
-## Samsung S23 setup
+You do not need to configure a project before generating. The app starts with:
 
-1. On the PC, start Continuity Studio with `START_CONTINUITY.cmd` or `pnpm local:dev`.
-2. Wait for the terminal to show `Phone/APK http://<LAN-IP>:3000`.
-3. Keep the phone and PC on the same private Wi-Fi.
-4. Open the Android app and enter that Phone/APK URL.
-5. File uploads use Android's normal document picker.
-6. MP4 and ZIP downloads are sent to:
-   `Downloads/Continuity Studio/`
+- Nano Banana 2
+- 16:9 YouTube long-form
+- The Rise / cinematic technology-history continuity prompt
+- strict no-watermark / no-random-text constraints
+- draft autosave
+- automatic result saving
+- optional reference images
 
-No access to `/Android/data` is required.
+Normal scene workflow:
 
-Google Flow automation and FFmpeg rendering continue to run on the PC. The Android app talks to them through Continuity Studio's local server proxy.
+1. paste narration / scene idea
+2. optionally attach reference images
+3. tap Generate image
 
-## CI build
+The result automatically saves to:
 
-The APK workflow locates the Android command-line SDK on the GitHub runner, installs Android 35, builds the debug APK, and uploads it as `Continuity-Studio-S23-APK`.
+`Downloads/Continuity Studio/Generated/`
+
+## One-time API key
+
+The only account-specific item that cannot be shipped already filled is the user's Gemini API key.
+
+It is entered once, encrypted with Android Keystore, and reused automatically afterward.
+
+Standalone models:
+
+- Nano Banana 2 Lite → `gemini-3.1-flash-lite-image`
+- Nano Banana 2 → `gemini-3.1-flash-image`
+- Nano Banana Pro → `gemini-3-pro-image`
+
+## Desktop separation
+
+The old PC-connected client remains available as the optional `DesktopCompanionActivity`.
+
+The standalone generator does not require the desktop app or PC to be running.
