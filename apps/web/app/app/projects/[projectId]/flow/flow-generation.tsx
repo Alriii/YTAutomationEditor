@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Play, RefreshCw } from "lucide-react";
 
-type FlowModel =
+export type FlowModel =
   | "Nano Banana 2 Lite"
   | "Nano Banana 2"
   | "Nano Banana Pro";
@@ -48,14 +48,36 @@ function base64File(base64: string, sceneNumber: number): File {
   );
 }
 
-export function FlowGeneration({ projectId }: { projectId: string }) {
+export function FlowGeneration({
+  projectId,
+  initialModel,
+}: {
+  projectId: string;
+  initialModel: FlowModel;
+}) {
   const router = useRouter();
-  const [model, setModel] = useState<FlowModel>("Nano Banana 2 Lite");
+  const [model, setModel] = useState<FlowModel>(initialModel);
   const [bridgeOnline, setBridgeOnline] = useState<boolean>();
   const [plan, setPlan] = useState<Plan>();
   const [runs, setRuns] = useState<Record<string, SceneRun>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string>();
+
+  async function saveModel(next: FlowModel) {
+    const response = await fetch(
+      `/api/v1/projects/${projectId}/flow-settings`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: next }),
+      },
+    );
+
+    if (!response.ok) {
+      const body = (await response.json()) as { error?: string };
+      setMessage(body.error ?? "Could not save Flow model choice.");
+    }
+  }
 
   async function checkBridge() {
     try {
@@ -144,6 +166,10 @@ export function FlowGeneration({ projectId }: { projectId: string }) {
         mimeType: file.type,
         fileSizeBytes: file.size,
         sha256: await sha256(file),
+        source: "flow",
+        model,
+        sourcePrompt: scene.prompt,
+        continuityFingerprint: scene.fingerprint,
       }),
     });
 
@@ -254,15 +280,17 @@ export function FlowGeneration({ projectId }: { projectId: string }) {
         <div className="flex flex-wrap items-center gap-3">
           <select
             value={model}
+            disabled={busy}
             onChange={(event) => {
-              setModel(event.target.value as FlowModel);
+              const next = event.target.value as FlowModel;
+              setModel(next);
               setPlan(undefined);
+              setRuns({});
+              void saveModel(next);
             }}
             className="rounded-xl border border-white/10 bg-[#0d111a] px-3 py-2.5 text-sm"
           >
-            <option value="Nano Banana 2 Lite">
-              Nano Banana 2 Lite · Flow free default
-            </option>
+            <option value="Nano Banana 2 Lite">Nano Banana 2 Lite</option>
             <option value="Nano Banana 2">Nano Banana 2</option>
             <option value="Nano Banana Pro">Nano Banana Pro</option>
           </select>
@@ -361,6 +389,16 @@ export function FlowGeneration({ projectId }: { projectId: string }) {
                       Retry scene
                     </button>
                   )}
+                  {!scene.locked &&
+                    (run.state === "skipped" || run.state === "done") && (
+                      <button
+                        onClick={() => void generateScene(scene)}
+                        disabled={busy}
+                        className="mt-2 block text-xs text-violet-300"
+                      >
+                        Generate another
+                      </button>
+                    )}
                 </div>
               </div>
             );

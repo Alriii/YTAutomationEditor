@@ -399,6 +399,7 @@ model Asset {
   fileSizeBytes       BigInt?
   sha256              String?
   sourcePrompt        String?
+  continuityFingerprint String?
   providerAssetId     String?
   seed                String?
   locked              Boolean             @default(false)

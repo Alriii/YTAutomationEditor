@@ -147,6 +147,13 @@ export function StoryboardGrid({
                     {scene.assets.length} render
                     {scene.assets.length === 1 ? "" : "s"}
                   </p>
+                  {selected && (
+                    <p className="mt-1 text-[10px] text-violet-200/50">
+                      {selected.provider === "flow.google.com"
+                        ? `Flow · ${selected.model ?? "Nano Banana"}`
+                        : "Creator upload"}
+                    </p>
+                  )}
                 </div>
 
                 <button

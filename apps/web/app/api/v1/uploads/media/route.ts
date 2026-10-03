@@ -6,30 +6,67 @@ import { requireAppUser } from "@/lib/auth";
 import { errorResponse } from "@/lib/http";
 import { signR2Put } from "@/lib/storage/r2";
 
-const schema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("voiceover"),
-    projectId: z.string().uuid(),
-    mimeType: z.enum([
-      "audio/mpeg",
-      "audio/wav",
-      "audio/x-wav",
-      "audio/mp4",
-      "audio/x-m4a",
-    ]),
-    fileSizeBytes: z.number().int().positive().max(500 * 1024 * 1024),
-    sha256: z.string().regex(/^[a-f0-9]{64}$/i),
-    durationMs: z.number().int().positive().max(24 * 60 * 60 * 1000).optional(),
-  }),
-  z.object({
+const flowModelSchema = z.enum([
+  "Nano Banana 2 Lite",
+  "Nano Banana 2",
+  "Nano Banana Pro",
+]);
+
+const voiceoverSchema = z.object({
+  kind: z.literal("voiceover"),
+  projectId: z.string().uuid(),
+  mimeType: z.enum([
+    "audio/mpeg",
+    "audio/wav",
+    "audio/x-wav",
+    "audio/mp4",
+    "audio/x-m4a",
+  ]),
+  fileSizeBytes: z.number().int().positive().max(500 * 1024 * 1024),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/i),
+  durationMs: z.number().int().positive().max(24 * 60 * 60 * 1000).optional(),
+});
+
+const sceneImageSchema = z
+  .object({
     kind: z.literal("scene-image"),
     projectId: z.string().uuid(),
     sceneId: z.string().uuid(),
     mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
     fileSizeBytes: z.number().int().positive().max(30 * 1024 * 1024),
     sha256: z.string().regex(/^[a-f0-9]{64}$/i),
-  }),
-]);
+    source: z.enum(["manual", "flow"]).default("manual"),
+    model: flowModelSchema.optional(),
+    sourcePrompt: z.string().min(1).max(50_000).optional(),
+    continuityFingerprint: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.source !== "flow") return;
+
+    if (!value.model) {
+      context.addIssue({
+        code: "custom",
+        path: ["model"],
+        message: "Flow model is required for Flow renders.",
+      });
+    }
+    if (!value.sourcePrompt) {
+      context.addIssue({
+        code: "custom",
+        path: ["sourcePrompt"],
+        message: "Compiled prompt is required for Flow renders.",
+      });
+    }
+    if (!value.continuityFingerprint) {
+      context.addIssue({
+        code: "custom",
+        path: ["continuityFingerprint"],
+        message: "Continuity fingerprint is required for Flow renders.",
+      });
+    }
+  });
+
+const schema = z.union([voiceoverSchema, sceneImageSchema]);
 
 function extensionFor(mimeType: string): string {
   if (mimeType === "image/png") return "png";
@@ -59,9 +96,10 @@ export async function POST(request: Request) {
       if (!scene) throw new Error("NOT_FOUND");
 
       const extension = extensionFor(input.mimeType);
+      const sourcePrefix = input.source === "flow" ? "flow" : "manual";
       const storageKey =
         `users/${user.id}/projects/${input.projectId}/scenes/` +
-        `${String(scene.sceneNumber).padStart(3, "0")}/manual-${randomUUID()}.${extension}`;
+        `${String(scene.sceneNumber).padStart(3, "0")}/${sourcePrefix}-${randomUUID()}.${extension}`;
 
       const asset = await db.asset.create({
         data: {
@@ -69,8 +107,12 @@ export async function POST(request: Request) {
           sceneId: scene.id,
           type: "IMAGE",
           role: "SCENE_RENDER",
-          provider: "manual",
-          model: "uploaded",
+          provider: input.source === "flow" ? "flow.google.com" : "manual",
+          model: input.source === "flow" ? input.model : "uploaded",
+          sourcePrompt:
+            input.source === "flow" ? input.sourcePrompt : null,
+          continuityFingerprint:
+            input.source === "flow" ? input.continuityFingerprint : null,
           storageKey,
           mimeType: input.mimeType,
           fileSizeBytes: BigInt(input.fileSizeBytes),

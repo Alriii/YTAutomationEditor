@@ -21,6 +21,14 @@ export async function POST(request: Request, context: Context) {
     const { project } = await requireOwnedProject(projectId);
     const input = schema.parse(await request.json());
 
+    await db.project.update({
+      where: { id: projectId },
+      data: {
+        defaultImageProvider: "flow.google.com",
+        defaultImageModel: input.model,
+      },
+    });
+
     const scenes = await db.scene.findMany({
       where: { projectId },
       orderBy: { sceneNumber: "asc" },
