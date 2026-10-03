@@ -69,7 +69,7 @@ START_CONTINUITY.cmd
 
 It checks Node/Docker, installs dependencies when needed, then launches the same free local stack. macOS/Linux users can run `./start-continuity.sh`.
 
-On the first run it prepares the local infrastructure automatically. On later runs it reuses the saved database/storage volumes and starts only missing app processes.
+On the first run it prepares the local infrastructure automatically. On later runs it reuses the saved database/storage volumes and starts only missing app processes. It waits for Studio, Flow, FFmpeg, Inngest, and MinIO health checks before reporting Ready, then opens the Studio in your default browser.
 
 The launcher starts or reuses:
 
@@ -354,6 +354,7 @@ Useful local bridge overrides:
 | `FLOW_BROWSER_PATH` | explicit Chrome/Edge/Brave path |
 | `RENDER_BRIDGE_PORT` | render bridge port, default 4318 |
 | `RENDER_ALLOWED_ORIGIN` | web origin allowed to call the render bridge |
+| `LOCAL_OPEN_BROWSER=false` | keep the launcher from opening the Studio automatically |
 
 ## Security
 
