@@ -119,6 +119,7 @@ export const exportProjectFunction = inngest.createFunction(
           narration: scene.narration,
           durationMs: scene.durationHintMs ?? 4500,
           locked: scene.locked,
+          mediaSettings: scene.mediaSettings,
           storageKey: scene.selectedAsset!.storageKey,
         })),
       };
@@ -145,6 +146,7 @@ export const exportProjectFunction = inngest.createFunction(
           durationMs: scene.durationMs,
           narration: scene.narration,
           locked: scene.locked,
+          mediaSettings: scene.mediaSettings,
         });
         cursorMs += scene.durationMs;
       }

@@ -4,6 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Play, RotateCcw, Volume2 } from "lucide-react";
 import type { SubtitleCueInput } from "@continuity/shared";
 
+type FrameSettings = {
+  fit: "cover" | "contain";
+  scale: number;
+  x: number;
+  y: number;
+};
+
 type PreviewScene = {
   id: string;
   sceneNumber: number;
@@ -11,6 +18,7 @@ type PreviewScene = {
   narration: string;
   durationMs: number;
   imageUrl: string | null;
+  framing: FrameSettings;
 };
 
 type TimedScene = PreviewScene & {
@@ -41,6 +49,10 @@ export function RoughCutPlayer({
   const [currentMs, setCurrentMs] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [audioDurationMs, setAudioDurationMs] = useState<number>();
+  const [framing, setFraming] = useState<Record<string, FrameSettings>>(
+    Object.fromEntries(scenes.map((scene) => [scene.id, scene.framing])),
+  );
+  const [framingMessage, setFramingMessage] = useState<string>();
   const silentStartRef = useRef<{ clock: number; position: number } | undefined>(undefined);
 
   const timedScenes = useMemo<TimedScene[]>(() => {
@@ -63,6 +75,37 @@ export function RoughCutPlayer({
   const activeCue = cues.find(
     (cue) => currentMs >= cue.startMs && currentMs < cue.endMs,
   );
+
+  const currentFraming = currentScene
+    ? framing[currentScene.id] ?? currentScene.framing
+    : undefined;
+
+  function updateFraming(patch: Partial<FrameSettings>) {
+    if (!currentScene) return;
+    setFraming((current) => ({
+      ...current,
+      [currentScene.id]: {
+        ...(current[currentScene.id] ?? currentScene.framing),
+        ...patch,
+      },
+    }));
+    setFramingMessage(undefined);
+  }
+
+  async function saveFraming() {
+    if (!currentScene || !currentFraming) return;
+    const response = await fetch(
+      `/api/v1/scenes/${currentScene.id}/media-settings`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(currentFraming),
+      },
+    );
+    setFramingMessage(
+      response.ok ? "Framing saved." : "Could not save framing.",
+    );
+  }
 
   function seek(nextMs: number) {
     const clamped = Math.min(Math.max(0, nextMs), totalDurationMs || 0);
@@ -152,7 +195,12 @@ export function RoughCutPlayer({
             <img
               src={currentScene.imageUrl}
               alt={currentScene.title || `Scene ${currentScene.sceneNumber}`}
-              className="h-full w-full object-cover"
+              className="h-full w-full"
+              style={{
+                objectFit: currentFraming?.fit ?? "cover",
+                transform: `translate(${currentFraming?.x ?? 0}%, ${currentFraming?.y ?? 0}%) scale(${currentFraming?.scale ?? 1})`,
+                transformOrigin: "center center",
+              }}
             />
           ) : (
             <div className="grid h-full place-items-center bg-gradient-to-br from-slate-950 to-slate-900 text-sm text-white/30">
@@ -265,6 +313,97 @@ export function RoughCutPlayer({
             <p className="mt-3 text-sm leading-6 text-white/45">
               {currentScene.narration}
             </p>
+            {currentScene.imageUrl && currentFraming && (
+              <div className="mt-5 border-t border-white/10 pt-4">
+                <div className="text-[10px] uppercase tracking-wider text-white/30">
+                  Image framing
+                </div>
+                <label className="mt-3 block text-xs text-white/45">
+                  Fit
+                  <select
+                    value={currentFraming.fit}
+                    onChange={(event) =>
+                      updateFraming({
+                        fit: event.target.value as "cover" | "contain",
+                      })
+                    }
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-[#0d111a] px-2 py-2 text-sm"
+                  >
+                    <option value="cover">Fill frame</option>
+                    <option value="contain">Fit whole image</option>
+                  </select>
+                </label>
+                <label className="mt-3 block text-xs text-white/45">
+                  Zoom {currentFraming.scale.toFixed(2)}×
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={3}
+                    step={0.05}
+                    value={currentFraming.scale}
+                    onChange={(event) =>
+                      updateFraming({ scale: Number(event.target.value) })
+                    }
+                    className="mt-1 w-full accent-violet-400"
+                  />
+                </label>
+                <label className="mt-3 block text-xs text-white/45">
+                  Horizontal {currentFraming.x.toFixed(0)}%
+                  <input
+                    type="range"
+                    min={-100}
+                    max={100}
+                    step={1}
+                    value={currentFraming.x}
+                    onChange={(event) =>
+                      updateFraming({ x: Number(event.target.value) })
+                    }
+                    className="mt-1 w-full accent-violet-400"
+                  />
+                </label>
+                <label className="mt-3 block text-xs text-white/45">
+                  Vertical {currentFraming.y.toFixed(0)}%
+                  <input
+                    type="range"
+                    min={-100}
+                    max={100}
+                    step={1}
+                    value={currentFraming.y}
+                    onChange={(event) =>
+                      updateFraming({ y: Number(event.target.value) })
+                    }
+                    className="mt-1 w-full accent-violet-400"
+                  />
+                </label>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() =>
+                      updateFraming({
+                        fit: "cover",
+                        scale: 1,
+                        x: 0,
+                        y: 0,
+                      })
+                    }
+                    className="rounded-lg border border-white/10 px-3 py-2 text-xs"
+                  >
+                    Reset
+                  </button>
+                  <button
+                    onClick={() => void saveFraming()}
+                    className="rounded-lg bg-violet-400 px-3 py-2 text-xs font-semibold text-slate-950"
+                  >
+                    Save framing
+                  </button>
+                </div>
+                {framingMessage && (
+                  <p className="mt-2 text-xs text-white/40">
+                    {framingMessage}
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="mt-5 border-t border-white/10 pt-4">
               <div className="text-[10px] uppercase tracking-wider text-white/30">
                 Active caption

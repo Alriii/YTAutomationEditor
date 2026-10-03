@@ -41,7 +41,15 @@ export default async function ReviewPage({
   ]);
 
   const preparedScenes = await Promise.all(
-    scenes.map(async (scene) => ({
+    scenes.map(async (scene) => {
+      const raw =
+        scene.mediaSettings &&
+        typeof scene.mediaSettings === "object" &&
+        !Array.isArray(scene.mediaSettings)
+          ? (scene.mediaSettings as Record<string, unknown>)
+          : {};
+
+      return ({
       id: scene.id,
       sceneNumber: scene.sceneNumber,
       title: scene.title ?? "",
@@ -50,7 +58,14 @@ export default async function ReviewPage({
       imageUrl: scene.selectedAsset
         ? await signR2Get(scene.selectedAsset.storageKey, 1800)
         : null,
-    })),
+      framing: {
+        fit: raw.fit === "contain" ? "contain" : "cover",
+        scale: typeof raw.scale === "number" ? raw.scale : 1,
+        x: typeof raw.x === "number" ? raw.x : 0,
+        y: typeof raw.y === "number" ? raw.y : 0,
+      },
+    });
+    }),
   );
 
   const voiceUrl =
