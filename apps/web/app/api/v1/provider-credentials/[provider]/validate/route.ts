@@ -17,9 +17,13 @@ export async function POST(_request: Request, context: Context) {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
     } else if (provider === "fal") {
-      response = await fetch("https://api.fal.ai/v1/models?limit=1", {
-        headers: { Authorization: `Key ${apiKey}` },
-      });
+      return Response.json(
+        {
+          valid: null,
+          error: "fal.ai does not expose a verified zero-cost key check in this integration. The key will be validated on first generation.",
+        },
+        { status: 422 },
+      );
     } else {
       return Response.json({ error: "Unsupported provider." }, { status: 400 });
     }

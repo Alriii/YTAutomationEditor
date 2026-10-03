@@ -28,17 +28,31 @@ export function ExportPanel({
   const [message, setMessage] = useState<string>();
 
   useEffect(() => {
-    if (!current || !["PENDING", "RUNNING"].includes(current.status)) return;
-    const timer = setInterval(async () => {
-      const response = await fetch(`/api/v1/exports/${current.id}`, {
+    if (!current) return;
+
+    let cancelled = false;
+    async function refresh() {
+      const response = await fetch(`/api/v1/exports/${current!.id}`, {
         cache: "no-store",
       });
-      if (!response.ok) return;
+      if (!response.ok || cancelled) return;
       const body = (await response.json()) as { export: ExportState };
-      setCurrent(body.export);
-    }, 1800);
-    return () => clearInterval(timer);
-  }, [current]);
+      if (!cancelled) setCurrent(body.export);
+    }
+
+    void refresh();
+    if (!["PENDING", "RUNNING"].includes(current.status)) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const timer = setInterval(() => void refresh(), 1800);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [current?.id, current?.status]);
 
   async function createExport() {
     setBusy(true);

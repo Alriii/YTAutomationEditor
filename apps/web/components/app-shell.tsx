@@ -9,7 +9,8 @@ const nav = [
   ["World", Map, "world"],
   ["Script", BookOpen, "script"],
   ["Scenes", Clapperboard, "scenes"],
-  ["Storyboard", Film, "storyboard"]
+  ["Storyboard", Film, "storyboard"],
+  ["Export", Film, "export"]
 ] as const;
 
 export function AppShell({ projectId, children }: { projectId?: string; children: React.ReactNode }) {
