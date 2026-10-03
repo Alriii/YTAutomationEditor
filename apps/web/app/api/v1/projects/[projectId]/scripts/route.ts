@@ -32,10 +32,16 @@ export async function PUT(request: Request, context: Context) {
         where: { projectId },
         orderBy: { createdAt: "asc" },
       });
+
       if (!script) {
-        script = await tx.script.create({ data: { projectId, title: input.title } });
+        script = await tx.script.create({
+          data: { projectId, title: input.title },
+        });
       } else if (script.title !== input.title) {
-        script = await tx.script.update({ where: { id: script.id }, data: { title: input.title } });
+        script = await tx.script.update({
+          where: { id: script.id },
+          data: { title: input.title },
+        });
       }
 
       const latest = await tx.scriptVersion.findFirst({
@@ -53,7 +59,7 @@ export async function PUT(request: Request, context: Context) {
           content: input.content,
           language: "en",
           wordCount,
-          targetDurationSec: input.targetDurationSec,
+          targetDurationSec: input.targetDurationSec ?? null,
           locked: input.locked,
         },
       });

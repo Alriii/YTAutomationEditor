@@ -48,18 +48,21 @@ export async function POST(request: Request, context: Context) {
       data: {
         projectId,
         sceneNumber: input.sceneNumber,
-        title: input.title,
+        title: input.title ?? null,
         narration: input.narration,
         visualIntent: input.visualIntent,
-        action: input.action,
-        shotType: input.shotType,
-        camera: input.camera,
-        lighting: input.lighting,
-        durationHintMs: input.durationHintMs,
+        action: input.action ?? null,
+        shotType: input.shotType ?? null,
+        camera: input.camera ?? null,
+        lighting: input.lighting ?? null,
+        durationHintMs: input.durationHintMs ?? null,
         continuityNotes: input.continuityNotes,
         status: "REVIEW",
         ...(location?.versions[0]
-          ? { locationId: location.id, locationVersionId: location.versions[0].id }
+          ? {
+              locationId: location.id,
+              locationVersionId: location.versions[0].id,
+            }
           : {}),
         characters: {
           create: characters
@@ -71,6 +74,7 @@ export async function POST(request: Request, context: Context) {
         },
       },
     });
+
     return Response.json({ scene }, { status: 201 });
   } catch (error) {
     return errorResponse(error);

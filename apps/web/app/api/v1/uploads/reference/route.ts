@@ -32,8 +32,12 @@ export async function POST(request: Request) {
       input.characterVersionId,
       input.locationVersionId,
     ].filter(Boolean).length;
+
     if (targetCount !== 1) {
-      return Response.json({ error: "Exactly one reference target is required." }, { status: 400 });
+      return Response.json(
+        { error: "Exactly one reference target is required." },
+        { status: 400 },
+      );
     }
 
     if (input.styleBibleVersionId) {
@@ -72,7 +76,9 @@ export async function POST(request: Request) {
         : input.mimeType === "image/webp"
           ? "webp"
           : "jpg";
-    const storageKey = `users/${user.id}/projects/${input.projectId}/references/${randomUUID()}.${extension}`;
+
+    const storageKey =
+      `users/${user.id}/projects/${input.projectId}/references/${randomUUID()}.${extension}`;
 
     const asset = await db.asset.create({
       data: {
@@ -83,9 +89,9 @@ export async function POST(request: Request) {
         mimeType: input.mimeType,
         fileSizeBytes: BigInt(input.fileSizeBytes),
         sha256: input.sha256.toLowerCase(),
-        styleBibleVersionId: input.styleBibleVersionId,
-        characterVersionId: input.characterVersionId,
-        locationVersionId: input.locationVersionId,
+        styleBibleVersionId: input.styleBibleVersionId ?? null,
+        characterVersionId: input.characterVersionId ?? null,
+        locationVersionId: input.locationVersionId ?? null,
       },
       select: {
         id: true,

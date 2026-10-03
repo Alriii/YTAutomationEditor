@@ -26,20 +26,22 @@ export async function PUT(request: Request, context: Context) {
         orderBy: { version: "desc" },
         select: { version: true },
       });
+
       await tx.location.update({
         where: { id: locationId },
         data: { name: input.name, locked: input.locked },
       });
+
       return tx.locationVersion.create({
         data: {
           locationId,
           version: (latest?.version ?? 0) + 1,
           description: input.description,
-          era: input.era,
-          architectureRules: input.architectureRules,
-          technologyRules: input.technologyRules,
-          lightingRules: input.lightingRules,
-          environmentalRules: input.environmentalRules,
+          era: input.era ?? null,
+          architectureRules: input.architectureRules ?? null,
+          technologyRules: input.technologyRules ?? null,
+          lightingRules: input.lightingRules ?? null,
+          environmentalRules: input.environmentalRules ?? null,
           prohibitedElements: input.prohibitedElements,
         },
       });

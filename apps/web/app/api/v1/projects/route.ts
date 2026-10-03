@@ -21,16 +21,18 @@ export async function POST(request: Request) {
   try {
     const user = await requireAppUser();
     const input = createProjectSchema.parse(await request.json());
+
     const project = await db.project.create({
       data: {
         ownerId: user.id,
         title: input.title,
-        description: input.description,
+        description: input.description ?? null,
         aspectRatio: input.aspectRatio,
         language: input.language,
-        targetDurationSec: input.targetDurationSec,
+        targetDurationSec: input.targetDurationSec ?? null,
       },
     });
+
     return Response.json({ project }, { status: 201 });
   } catch (error) {
     return errorResponse(error);

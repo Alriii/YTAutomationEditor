@@ -31,11 +31,25 @@ export async function PUT(request: Request, context: Context) {
         orderBy: { version: "desc" },
         select: { version: true },
       });
+
       return tx.styleBibleVersion.create({
         data: {
           projectId,
           version: (latest?.version ?? 0) + 1,
-          ...input,
+          name: input.name,
+          visualStyle: input.visualStyle,
+          mediumRules: input.mediumRules ?? null,
+          cameraRules: input.cameraRules ?? null,
+          lightingRules: input.lightingRules ?? null,
+          colorRules: input.colorRules ?? null,
+          compositionRules: input.compositionRules ?? null,
+          historicalRules: input.historicalRules ?? null,
+          wardrobeRules: input.wardrobeRules ?? null,
+          technologyRules: input.technologyRules ?? null,
+          negativeConstraints: input.negativeConstraints,
+          promptPrefix: input.promptPrefix ?? null,
+          promptSuffix: input.promptSuffix ?? null,
+          locked: input.locked,
         },
       });
     });

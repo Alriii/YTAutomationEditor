@@ -25,6 +25,7 @@ export async function POST(request: Request, context: Context) {
     const { projectId } = await context.params;
     await requireOwnedProject(projectId);
     const input = locationSchema.parse(await request.json());
+
     const location = await db.location.create({
       data: {
         projectId,
@@ -34,17 +35,18 @@ export async function POST(request: Request, context: Context) {
           create: {
             version: 1,
             description: input.description,
-            era: input.era,
-            architectureRules: input.architectureRules,
-            technologyRules: input.technologyRules,
-            lightingRules: input.lightingRules,
-            environmentalRules: input.environmentalRules,
+            era: input.era ?? null,
+            architectureRules: input.architectureRules ?? null,
+            technologyRules: input.technologyRules ?? null,
+            lightingRules: input.lightingRules ?? null,
+            environmentalRules: input.environmentalRules ?? null,
             prohibitedElements: input.prohibitedElements,
           },
         },
       },
       include: { versions: true },
     });
+
     return Response.json({ location }, { status: 201 });
   } catch (error) {
     return errorResponse(error);

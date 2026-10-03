@@ -26,29 +26,27 @@ export async function POST(request: Request, context: Context) {
     await requireOwnedProject(projectId);
     const input = characterSchema.parse(await request.json());
 
-    const character = await db.$transaction(async (tx) => {
-      return tx.character.create({
-        data: {
-          projectId,
-          name: input.name,
-          role: input.role,
-          locked: input.locked,
-          versions: {
-            create: {
-              version: 1,
-              description: input.description,
-              physicalTraits: input.physicalTraits,
-              ageDescription: input.ageDescription,
-              hairRules: input.hairRules,
-              wardrobeRules: input.wardrobeRules,
-              accessoryRules: input.accessoryRules,
-              expressionRules: input.expressionRules,
-              prohibitedChanges: input.prohibitedChanges,
-            },
+    const character = await db.character.create({
+      data: {
+        projectId,
+        name: input.name,
+        role: input.role ?? null,
+        locked: input.locked,
+        versions: {
+          create: {
+            version: 1,
+            description: input.description,
+            physicalTraits: input.physicalTraits ?? null,
+            ageDescription: input.ageDescription ?? null,
+            hairRules: input.hairRules ?? null,
+            wardrobeRules: input.wardrobeRules ?? null,
+            accessoryRules: input.accessoryRules ?? null,
+            expressionRules: input.expressionRules ?? null,
+            prohibitedChanges: input.prohibitedChanges,
           },
         },
-        include: { versions: true },
-      });
+      },
+      include: { versions: true },
     });
 
     return Response.json({ character }, { status: 201 });

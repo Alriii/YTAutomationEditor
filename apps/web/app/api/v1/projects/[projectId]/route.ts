@@ -30,10 +30,20 @@ export async function PATCH(request: Request, context: Context) {
     const { projectId } = await context.params;
     const { user } = await requireOwnedProject(projectId);
     const input = updateProjectSchema.parse(await request.json());
+
     const project = await db.project.update({
       where: { id: projectId, ownerId: user.id },
-      data: input,
+      data: {
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(input.aspectRatio !== undefined ? { aspectRatio: input.aspectRatio } : {}),
+        ...(input.language !== undefined ? { language: input.language } : {}),
+        ...(input.targetDurationSec !== undefined
+          ? { targetDurationSec: input.targetDurationSec }
+          : {}),
+      },
     });
+
     return Response.json({ project });
   } catch (error) {
     return errorResponse(error);

@@ -26,21 +26,27 @@ export async function PUT(request: Request, context: Context) {
         orderBy: { version: "desc" },
         select: { version: true },
       });
+
       await tx.character.update({
         where: { id: characterId },
-        data: { name: input.name, role: input.role, locked: input.locked },
+        data: {
+          name: input.name,
+          role: input.role ?? null,
+          locked: input.locked,
+        },
       });
+
       return tx.characterVersion.create({
         data: {
           characterId,
           version: (latest?.version ?? 0) + 1,
           description: input.description,
-          physicalTraits: input.physicalTraits,
-          ageDescription: input.ageDescription,
-          hairRules: input.hairRules,
-          wardrobeRules: input.wardrobeRules,
-          accessoryRules: input.accessoryRules,
-          expressionRules: input.expressionRules,
+          physicalTraits: input.physicalTraits ?? null,
+          ageDescription: input.ageDescription ?? null,
+          hairRules: input.hairRules ?? null,
+          wardrobeRules: input.wardrobeRules ?? null,
+          accessoryRules: input.accessoryRules ?? null,
+          expressionRules: input.expressionRules ?? null,
           prohibitedChanges: input.prohibitedChanges,
         },
       });

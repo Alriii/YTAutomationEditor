@@ -16,7 +16,6 @@ export const scriptBreakdownFunction = inngest.createFunction(
       const job = await db.generationJob.findUnique({
         where: { id: jobId },
         include: {
-          user: true,
           project: {
             include: {
               characters: {
@@ -51,49 +50,66 @@ export const scriptBreakdownFunction = inngest.createFunction(
           ],
         },
       });
+
       if (blockingScenes > 0) {
-        throw new Error("Existing approved or generated scenes must not be replaced by breakdown.");
+        throw new Error(
+          "Existing approved or generated scenes must not be replaced by breakdown.",
+        );
       }
 
       await db.generationJob.update({
         where: { id: job.id },
-        data: { status: "RUNNING", startedAt: new Date(), attemptCount: { increment: 1 }, progress: 10 },
+        data: {
+          status: "RUNNING",
+          startedAt: new Date(),
+          attemptCount: { increment: 1 },
+          progress: 10,
+        },
       });
+
+      const targetDurationSec =
+        scriptVersion.targetDurationSec ?? job.project.targetDurationSec;
 
       return {
         userId: job.userId,
         projectId: job.projectId,
         projectTitle: job.project.title,
         aspectRatio: job.project.aspectRatio,
-        targetDurationSec: scriptVersion.targetDurationSec ?? job.project.targetDurationSec ?? undefined,
         model: job.model,
         script: scriptVersion.content,
         scriptVersionId: scriptVersion.id,
+        ...(targetDurationSec !== null ? { targetDurationSec } : {}),
         characters: job.project.characters.map((character) => ({
           id: character.id,
           name: character.name,
           description: character.versions[0]?.description ?? "",
         })),
-        locations: job.project.locations.map((location) => ({
-          id: location.id,
-          name: location.name,
-          description: location.versions[0]?.description ?? "",
-          era: location.versions[0]?.era ?? undefined,
-        })),
+        locations: job.project.locations.map((location) => {
+          const era = location.versions[0]?.era;
+          return {
+            id: location.id,
+            name: location.name,
+            description: location.versions[0]?.description ?? "",
+            ...(era ? { era } : {}),
+          };
+        }),
       };
     });
 
     const breakdown = await step.run("generate-breakdown", async () => {
       const apiKey = await getProviderApiKey(snapshot.userId, "openai");
+
       return breakDownScriptWithOpenAI({
         apiKey,
         model: snapshot.model,
         projectTitle: snapshot.projectTitle,
         script: snapshot.script,
         aspectRatio: snapshot.aspectRatio,
-        targetDurationSec: snapshot.targetDurationSec,
         characters: snapshot.characters,
         locations: snapshot.locations,
+        ...(snapshot.targetDurationSec !== undefined
+          ? { targetDurationSec: snapshot.targetDurationSec }
+          : {}),
       });
     });
 
@@ -104,27 +120,37 @@ export const scriptBreakdownFunction = inngest.createFunction(
             where: { projectId: snapshot.projectId },
             include: { versions: { orderBy: { version: "desc" }, take: 1 } },
           })
-        ).map((character) => [character.id, character])
+        ).map((character) => [character.id, character]),
       );
+
       const locationMap = new Map(
         (
           await db.location.findMany({
             where: { projectId: snapshot.projectId },
             include: { versions: { orderBy: { version: "desc" }, take: 1 } },
           })
-        ).map((location) => [location.id, location])
+        ).map((location) => [location.id, location]),
       );
 
       return db.$transaction(async (tx) => {
         await tx.scene.deleteMany({
-          where: { projectId: snapshot.projectId, status: { in: ["DRAFT", "REVIEW"] } },
+          where: {
+            projectId: snapshot.projectId,
+            status: { in: ["DRAFT", "REVIEW"] },
+          },
         });
 
         for (const [index, source] of breakdown.scenes.entries()) {
-          const location = source.locationId ? locationMap.get(source.locationId) : undefined;
+          const location = source.locationId
+            ? locationMap.get(source.locationId)
+            : undefined;
+
           const characters = source.characterIds
             .map((id) => characterMap.get(id))
-            .filter((value): value is NonNullable<typeof value> => Boolean(value?.versions[0]));
+            .filter(
+              (value): value is NonNullable<typeof value> =>
+                Boolean(value?.versions[0]),
+            );
 
           await tx.scene.create({
             data: {
@@ -169,8 +195,12 @@ export const scriptBreakdownFunction = inngest.createFunction(
             status: "SUCCEEDED",
             progress: 100,
             completedAt: new Date(),
-            inputTokens: breakdown.usage?.inputTokens,
-            outputTokens: breakdown.usage?.outputTokens,
+            ...(breakdown.usage?.inputTokens !== undefined
+              ? { inputTokens: breakdown.usage.inputTokens }
+              : {}),
+            ...(breakdown.usage?.outputTokens !== undefined
+              ? { outputTokens: breakdown.usage.outputTokens }
+              : {}),
           },
         });
 
@@ -179,5 +209,5 @@ export const scriptBreakdownFunction = inngest.createFunction(
     });
 
     return { scenesCreated: created };
-  }
+  },
 );
