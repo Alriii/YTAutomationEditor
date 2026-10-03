@@ -1,5 +1,6 @@
 import { db } from "@continuity/db";
 import { requireOwnedProject } from "@/lib/auth";
+import { ReferenceUploader } from "@/components/reference-uploader";
 import { CharacterCreator } from "./character-creator";
 
 export default async function CastPage({ params }: { params: Promise<{ projectId: string }> }) {
@@ -8,7 +9,18 @@ export default async function CastPage({ params }: { params: Promise<{ projectId
   const characters = await db.character.findMany({
     where: { projectId },
     orderBy: { createdAt: "asc" },
-    include: { versions: { orderBy: { version: "desc" }, take: 1 } },
+    include: {
+      versions: {
+        orderBy: { version: "desc" },
+        take: 1,
+        include: {
+          assets: {
+            where: { role: "CHARACTER_REFERENCE" },
+            select: { id: true },
+          },
+        },
+      },
+    },
   });
 
   return (
@@ -33,6 +45,16 @@ export default async function CastPage({ params }: { params: Promise<{ projectId
               </div>
               <p className="mt-4 text-sm leading-6 text-white/50">{version?.description}</p>
               {version?.wardrobeRules && <div className="mt-4 border-t border-white/10 pt-3 text-xs text-white/35">Wardrobe: {version.wardrobeRules}</div>}
+              {version && (
+                <div className="mt-4 flex items-center gap-2 border-t border-white/10 pt-4">
+                  <ReferenceUploader
+                    projectId={projectId}
+                    role="CHARACTER_REFERENCE"
+                    target={{ characterVersionId: version.id }}
+                  />
+                  <span className="text-[10px] text-white/30">{version.assets.length} refs</span>
+                </div>
+              )}
             </article>
           );
         })}
