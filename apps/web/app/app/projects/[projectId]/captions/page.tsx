@@ -10,10 +10,21 @@ export default async function CaptionsPage({
   const { projectId } = await params;
   await requireOwnedProject(projectId);
 
-  const cues = await db.subtitleCue.findMany({
-    where: { projectId },
-    orderBy: [{ startMs: "asc" }, { order: "asc" }],
-  });
+  const [cues, scenes] = await Promise.all([
+    db.subtitleCue.findMany({
+      where: { projectId },
+      orderBy: [{ startMs: "asc" }, { order: "asc" }],
+    }),
+    db.scene.findMany({
+      where: { projectId },
+      orderBy: { sceneNumber: "asc" },
+      select: {
+        sceneNumber: true,
+        narration: true,
+        durationHintMs: true,
+      },
+    }),
+  ]);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -22,7 +33,7 @@ export default async function CaptionsPage({
       </div>
       <h1 className="mt-2 text-3xl font-semibold">Captions</h1>
       <p className="mt-2 max-w-3xl text-sm text-white/45">
-        Import SRT/VTT or edit cues manually. Timing and wording stay editable before final review.
+        Import SRT/VTT, build a free first pass from storyboard narration, then edit every cue and timing before review.
       </p>
       <CaptionEditor
         projectId={projectId}
@@ -31,6 +42,11 @@ export default async function CaptionsPage({
           startMs: cue.startMs,
           endMs: cue.endMs,
           text: cue.text,
+        }))}
+        scenes={scenes.map((scene) => ({
+          sceneNumber: scene.sceneNumber,
+          narration: scene.narration,
+          durationMs: scene.durationHintMs ?? 4500,
         }))}
       />
     </div>

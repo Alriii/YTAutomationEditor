@@ -10,9 +10,15 @@ function seconds(ms: number): string {
 export function CaptionEditor({
   projectId,
   initialCues,
+  scenes,
 }: {
   projectId: string;
   initialCues: SubtitleCueInput[];
+  scenes: Array<{
+    sceneNumber: number;
+    narration: string;
+    durationMs: number;
+  }>;
 }) {
   const [cues, setCues] = useState(initialCues);
   const [saving, setSaving] = useState(false);
@@ -40,6 +46,49 @@ export function CaptionEditor({
       response.ok
         ? `${body.saved ?? cues.length} subtitle cues saved.`
         : body.error ?? "Could not save subtitles.",
+    );
+  }
+
+  function buildFromScenes() {
+    let cursor = 0;
+    const generated: SubtitleCueInput[] = [];
+
+    for (const scene of scenes) {
+      const words = scene.narration.trim().split(/\s+/).filter(Boolean);
+      if (!words.length) {
+        cursor += scene.durationMs;
+        continue;
+      }
+
+      const chunkSize = words.length <= 8 ? words.length : 7;
+      const chunks: string[] = [];
+      for (let index = 0; index < words.length; index += chunkSize) {
+        chunks.push(words.slice(index, index + chunkSize).join(" "));
+      }
+
+      const cueDuration = Math.max(400, scene.durationMs / chunks.length);
+
+      chunks.forEach((text, index) => {
+        const startMs = Math.round(cursor + index * cueDuration);
+        const endMs =
+          index === chunks.length - 1
+            ? cursor + scene.durationMs
+            : Math.round(cursor + (index + 1) * cueDuration);
+
+        generated.push({
+          order: generated.length + 1,
+          startMs,
+          endMs,
+          text,
+        });
+      });
+
+      cursor += scene.durationMs;
+    }
+
+    setCues(generated);
+    setMessage(
+      `Built ${generated.length} editable cues from storyboard timing. Review them against the voiceover before export.`,
     );
   }
 
@@ -76,6 +125,13 @@ export function CaptionEditor({
           />
           Import SRT / VTT
         </label>
+        <button
+          onClick={buildFromScenes}
+          disabled={!scenes.length}
+          className="rounded-xl border border-white/10 px-4 py-2.5 text-sm disabled:opacity-40"
+        >
+          Auto from narration
+        </button>
         <button
           onClick={() =>
             setCues((current) => [
