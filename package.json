@@ -22,7 +22,8 @@
     "local:down": "docker compose -f docker-compose.local.yml down",
     "local:start": "pnpm local:setup && pnpm local:infra && pnpm local:renderer && pnpm db:generate && pnpm db:push",
     "render:bridge": "node scripts/render-bridge.mjs",
-    "local:renderer": "docker compose -f docker-compose.local.yml build renderer"
+    "local:renderer": "docker compose -f docker-compose.local.yml build renderer",
+    "local:dev": "node scripts/local-dev.mjs"
   },
   "devDependencies": {
     "turbo": "^2.5.8",

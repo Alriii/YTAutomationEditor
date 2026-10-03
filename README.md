@@ -55,13 +55,24 @@ corepack enable
 pnpm install
 ```
 
-Prepare the free local stack:
+Start the complete free local app with one command:
 
 ```bash
-pnpm local:start
+pnpm local:dev
 ```
 
-That command:
+On the first run it prepares the local infrastructure automatically. On later runs it reuses the saved database/storage volumes and starts only missing app processes.
+
+The launcher starts or reuses:
+
+- Continuity Studio
+- Google Flow bridge
+- FFmpeg render bridge
+- PostgreSQL
+- MinIO
+- Inngest Dev Server
+
+Under the hood, `pnpm local:start` performs the infrastructure preparation:
 
 1. creates `apps/web/.env.local`
 2. creates `packages/db/.env`
@@ -74,13 +85,7 @@ That command:
 9. builds the local FFmpeg renderer image
 10. pushes the development database schema
 
-Then start the web app:
-
-```bash
-pnpm dev
-```
-
-Open:
+Once `pnpm local:dev` reports Ready, open:
 
 ```text
 http://localhost:3000
@@ -88,13 +93,7 @@ http://localhost:3000
 
 Local mode has no sign-in screen. It uses a single local creator workspace.
 
-For Google Flow image generation, run in another terminal:
-
-```bash
-pnpm flow:bridge
-```
-
-The bridge first tries an installed Brave, Chrome, or Edge browser. If none is available:
+The Flow bridge starts automatically. It first tries an installed Brave, Chrome, or Edge browser. If none is available:
 
 ```bash
 pnpm flow:install
@@ -103,13 +102,7 @@ pnpm flow:bridge
 
 On first use, sign into Google in the browser opened by the bridge and select or create the Flow project you want Continuity Studio to use.
 
-For final MP4 rendering, run one more local bridge:
-
-```bash
-pnpm render:bridge
-```
-
-The Export screen can then render the reviewed project locally with Docker + FFmpeg and upload the finished MP4 back into the project's private storage.
+The render bridge also starts automatically. The Export screen can render the reviewed project locally with Docker + FFmpeg and upload the finished MP4 back into the project's private storage.
 
 Stop local infrastructure with:
 
@@ -378,6 +371,7 @@ pnpm typecheck
 node --check scripts/flow-bridge.mjs
 node --check scripts/render-bridge.mjs
 node --check scripts/setup-local.mjs
+node --check scripts/local-dev.mjs
 docker compose -f docker-compose.local.yml config
 docker compose -f docker-compose.local.yml build renderer
 pnpm test
