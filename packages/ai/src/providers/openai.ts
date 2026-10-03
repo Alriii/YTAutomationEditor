@@ -24,18 +24,12 @@ async function parseImages(response: Response): Promise<GeneratedImage[]> {
   if (!response.ok) {
     throw new Error(`OpenAI image request failed (${response.status}): ${await response.text()}`);
   }
-
   const body = (await response.json()) as OpenAIImageResponse;
   const images = (body.data ?? [])
     .filter((item): item is { b64_json: string } => Boolean(item.b64_json))
-    .map((item) => ({
-      bytes: decodeBase64(item.b64_json),
-      mimeType: "image/png",
-    }));
+    .map((item) => ({ bytes: decodeBase64(item.b64_json), mimeType: "image/png" }));
 
-  if (!images.length) {
-    throw new Error("OpenAI returned no image data.");
-  }
+  if (!images.length) throw new Error("OpenAI returned no image data.");
   return images;
 }
 
@@ -46,10 +40,7 @@ export class OpenAIImageProvider implements ImageProvider {
     return estimateImageCost(this.id, request);
   }
 
-  async generate(
-    request: ImageGenerationRequest,
-    apiKey: string,
-  ): Promise<ImageGenerationResult> {
+  async generate(request: ImageGenerationRequest, apiKey: string): Promise<ImageGenerationResult> {
     const prompt = request.negativePrompt
       ? `${request.prompt}\n\nNEGATIVE CONSTRAINTS:\n${request.negativePrompt}`
       : request.prompt;
@@ -66,8 +57,9 @@ export class OpenAIImageProvider implements ImageProvider {
           model: request.model,
           prompt,
           size: sizeForRatio(request.aspectRatio),
-          n: 1,
+          quality: "medium",
           output_format: "png",
+          n: 1,
         }),
       });
     } else {
@@ -75,13 +67,13 @@ export class OpenAIImageProvider implements ImageProvider {
       form.set("model", request.model);
       form.set("prompt", prompt);
       form.set("size", sizeForRatio(request.aspectRatio));
+      form.set("quality", "medium");
+      form.set("output_format", "png");
       form.set("n", "1");
 
       for (const [index, reference] of request.references.entries()) {
         const fetched = await fetch(reference.url);
-        if (!fetched.ok) {
-          throw new Error(`Could not fetch reference asset ${reference.assetId}.`);
-        }
+        if (!fetched.ok) throw new Error(`Could not fetch reference asset ${reference.assetId}.`);
         const blob = await fetched.blob();
         form.append("image[]", blob, `reference-${index}.png`);
       }
