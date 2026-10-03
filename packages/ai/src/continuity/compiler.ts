@@ -125,10 +125,12 @@ export async function compileContinuity(
     .filter(Boolean)
     .join(", ");
 
+  // Reference capacity is finite on image models. Identity continuity wins first,
+  // then scene/world continuity, then global style references.
   const references = [
-    ...style.references,
     ...input.characters.flatMap((character) => character.references),
     ...(input.location?.references ?? []),
+    ...style.references,
   ];
 
   const fingerprint = await createGenerationFingerprint({
