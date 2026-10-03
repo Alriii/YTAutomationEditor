@@ -3,7 +3,13 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "android-client/**"
+      - ".github/workflows/android-apk.yml"
   pull_request:
+    paths-ignore:
+      - "android-client/**"
+      - ".github/workflows/android-apk.yml"
 
 jobs:
   verify:
