@@ -1,0 +1,491 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Plan {
+  FREE
+  CREATOR
+  PRO
+}
+
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum ProjectWorkflowState {
+  SETUP
+  SCENE_REVIEW
+  READY_FOR_ESTIMATE
+  READY_FOR_GENERATION
+  GENERATING
+  COMPLETE
+}
+
+enum AspectRatio {
+  LANDSCAPE_16_9
+  VERTICAL_9_16
+  SQUARE_1_1
+}
+
+enum ContinuityMode {
+  STRICT
+}
+
+enum ScriptSource {
+  MANUAL
+  GENERATED
+  IMPORTED
+}
+
+enum ScriptVersionStatus {
+  DRAFT
+  REVIEW
+  LOCKED
+}
+
+enum SceneStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  QUEUED
+  GENERATING
+  COMPLETE
+  FAILED
+}
+
+enum AssetType {
+  IMAGE
+  VIDEO
+  AUDIO
+  JSON
+  ARCHIVE
+}
+
+enum AssetRole {
+  STYLE_REFERENCE
+  CHARACTER_REFERENCE
+  LOCATION_REFERENCE
+  SCENE_RENDER
+  EXPORT
+}
+
+enum GenerationJobType {
+  SCRIPT_BREAKDOWN
+  IMAGE_GENERATION
+  EXPORT
+}
+
+enum GenerationJobStatus {
+  PENDING
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum CredentialStatus {
+  ACTIVE
+  INVALID
+  REVOKED
+}
+
+enum ExportType {
+  ASSET_ZIP
+  MANIFEST
+}
+
+enum ExportStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum LedgerEntryType {
+  GRANT
+  PURCHASE
+  RESERVE
+  CAPTURE
+  RELEASE
+  REFUND
+  ADJUSTMENT
+}
+
+model User {
+  id                  String               @id @default(uuid()) @db.Uuid
+  clerkUserId         String               @unique
+  email               String
+  displayName         String?
+  plan                Plan                 @default(FREE)
+  creditBalanceCached Int                  @default(0)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  projects            Project[]
+  providerCredentials ProviderCredential[]
+  generationJobs      GenerationJob[]
+  usageEntries        UsageLedger[]
+
+  @@index([email])
+}
+
+model Project {
+  id                   String               @id @default(uuid()) @db.Uuid
+  ownerId              String               @db.Uuid
+  owner                User                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title                String
+  description          String?
+  status               ProjectStatus        @default(DRAFT)
+  workflowState        ProjectWorkflowState @default(SETUP)
+  aspectRatio          AspectRatio          @default(LANDSCAPE_16_9)
+  language             String               @default("en")
+  targetDurationSec    Int?
+  continuityMode       ContinuityMode       @default(STRICT)
+  defaultImageProvider String?
+  defaultImageModel    String?
+  defaultTextProvider  String?
+  defaultTextModel     String?
+  continuityRevision   Int                  @default(1)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  deletedAt            DateTime?
+
+  styleBibleVersions StyleBibleVersion[]
+  characters         Character[]
+  locations          Location[]
+  scripts            Script[]
+  scenes             Scene[]
+  assets             Asset[]
+  generationJobs     GenerationJob[]
+  exports            Export[]
+  usageEntries       UsageLedger[]
+
+  @@index([ownerId, updatedAt])
+  @@index([ownerId, deletedAt])
+}
+
+model StyleBibleVersion {
+  id                  String   @id @default(uuid()) @db.Uuid
+  projectId           String   @db.Uuid
+  project             Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  version             Int
+  name                String   @default("Primary style")
+  visualStyle         String
+  mediumRules         String?
+  cameraRules         String?
+  lightingRules       String?
+  colorRules          String?
+  compositionRules    String?
+  historicalRules     String?
+  wardrobeRules       String?
+  technologyRules     String?
+  negativeConstraints String[] @default([])
+  promptPrefix        String?
+  promptSuffix        String?
+  locked              Boolean  @default(false)
+  createdAt           DateTime @default(now())
+
+  assets Asset[]
+
+  @@unique([projectId, version])
+  @@index([projectId, createdAt])
+}
+
+model Character {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @db.Uuid
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  role      String?
+  locked    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versions CharacterVersion[]
+  scenes   SceneCharacter[]
+
+  @@unique([projectId, name])
+  @@index([projectId, updatedAt])
+}
+
+model CharacterVersion {
+  id                String   @id @default(uuid()) @db.Uuid
+  characterId       String   @db.Uuid
+  character         Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  version           Int
+  description       String
+  physicalTraits    String?
+  ageDescription    String?
+  hairRules         String?
+  wardrobeRules     String?
+  accessoryRules    String?
+  expressionRules   String?
+  prohibitedChanges String[] @default([])
+  createdAt         DateTime @default(now())
+
+  assets Asset[]
+  scenes SceneCharacter[]
+
+  @@unique([characterId, version])
+  @@index([characterId, createdAt])
+}
+
+model Location {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @db.Uuid
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  locked    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versions LocationVersion[]
+  scenes   Scene[]
+
+  @@unique([projectId, name])
+  @@index([projectId, updatedAt])
+}
+
+model LocationVersion {
+  id                  String   @id @default(uuid()) @db.Uuid
+  locationId          String   @db.Uuid
+  location            Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  version             Int
+  description         String
+  era                 String?
+  architectureRules   String?
+  technologyRules     String?
+  lightingRules       String?
+  environmentalRules  String?
+  prohibitedElements  String[] @default([])
+  createdAt           DateTime @default(now())
+
+  assets Asset[]
+  scenes Scene[]
+
+  @@unique([locationId, version])
+  @@index([locationId, createdAt])
+}
+
+model Script {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @db.Uuid
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versions ScriptVersion[]
+
+  @@index([projectId, updatedAt])
+}
+
+model ScriptVersion {
+  id                 String              @id @default(uuid()) @db.Uuid
+  scriptId           String              @db.Uuid
+  script             Script              @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  version            Int
+  source             ScriptSource        @default(MANUAL)
+  status             ScriptVersionStatus @default(DRAFT)
+  content            String
+  language           String              @default("en")
+  wordCount          Int
+  targetDurationSec  Int?
+  generationMetadata Json?
+  locked             Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+
+  scenes Scene[]
+
+  @@unique([scriptId, version])
+  @@index([scriptId, createdAt])
+}
+
+model Scene {
+  id                 String       @id @default(uuid()) @db.Uuid
+  projectId          String       @db.Uuid
+  project            Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scriptVersionId    String?      @db.Uuid
+  scriptVersion      ScriptVersion? @relation(fields: [scriptVersionId], references: [id], onDelete: SetNull)
+  sceneNumber        Int
+  title              String?
+  narration          String
+  visualIntent       String
+  action             String?
+  shotType           String?
+  camera             String?
+  lighting           String?
+  locationId         String?      @db.Uuid
+  location           Location?    @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  locationVersionId  String?      @db.Uuid
+  locationVersion    LocationVersion? @relation(fields: [locationVersionId], references: [id], onDelete: SetNull)
+  durationHintMs     Int?
+  voiceStartMs       Int?
+  voiceEndMs         Int?
+  promptOverride     String?
+  continuityNotes    String[]     @default([])
+  status             SceneStatus  @default(DRAFT)
+  approvedAt         DateTime?
+  locked             Boolean      @default(false)
+  selectedAssetId    String?      @db.Uuid
+  selectedAsset      Asset?       @relation("SelectedSceneAsset", fields: [selectedAssetId], references: [id], onDelete: SetNull)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  characters     SceneCharacter[]
+  assets         Asset[]          @relation("SceneAssets")
+  generationJobs GenerationJob[]
+
+  @@unique([projectId, sceneNumber])
+  @@index([projectId, status])
+  @@index([scriptVersionId])
+}
+
+model SceneCharacter {
+  sceneId            String           @db.Uuid
+  characterId        String           @db.Uuid
+  characterVersionId String           @db.Uuid
+  scene              Scene            @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  character          Character        @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  characterVersion   CharacterVersion @relation(fields: [characterVersionId], references: [id], onDelete: Restrict)
+  required           Boolean          @default(true)
+  appearanceOverride String?
+
+  @@id([sceneId, characterId])
+  @@index([characterVersionId])
+}
+
+model Asset {
+  id                  String              @id @default(uuid()) @db.Uuid
+  projectId           String              @db.Uuid
+  project             Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sceneId             String?             @db.Uuid
+  scene               Scene?              @relation("SceneAssets", fields: [sceneId], references: [id], onDelete: SetNull)
+  characterVersionId  String?             @db.Uuid
+  characterVersion    CharacterVersion?   @relation(fields: [characterVersionId], references: [id], onDelete: SetNull)
+  locationVersionId   String?             @db.Uuid
+  locationVersion     LocationVersion?    @relation(fields: [locationVersionId], references: [id], onDelete: SetNull)
+  styleBibleVersionId String?             @db.Uuid
+  styleBibleVersion   StyleBibleVersion?  @relation(fields: [styleBibleVersionId], references: [id], onDelete: SetNull)
+  generationJobId     String?             @db.Uuid
+  generationJob       GenerationJob?      @relation(fields: [generationJobId], references: [id], onDelete: SetNull)
+  type                AssetType
+  role                AssetRole
+  provider            String?
+  model               String?
+  storageKey          String
+  mimeType            String
+  width               Int?
+  height              Int?
+  durationMs          Int?
+  fileSizeBytes       BigInt?
+  sha256              String?
+  sourcePrompt        String?
+  providerAssetId     String?
+  seed                String?
+  locked              Boolean             @default(false)
+  createdAt           DateTime            @default(now())
+
+  selectedByScenes Scene[] @relation("SelectedSceneAsset")
+
+  @@index([projectId, role])
+  @@index([sceneId, createdAt])
+  @@index([generationJobId])
+}
+
+model GenerationJob {
+  id                 String              @id @default(uuid()) @db.Uuid
+  userId             String              @db.Uuid
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId          String              @db.Uuid
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sceneId            String?             @db.Uuid
+  scene              Scene?              @relation(fields: [sceneId], references: [id], onDelete: SetNull)
+  type               GenerationJobType
+  provider           String
+  model              String
+  status             GenerationJobStatus @default(PENDING)
+  idempotencyKey     String              @unique
+  providerJobId      String?
+  inputSnapshot      Json
+  continuitySnapshot Json?
+  estimatedCredits   Int
+  actualCredits      Int?
+  estimatedUsd       Decimal?            @db.Decimal(12, 6)
+  actualUsd          Decimal?            @db.Decimal(12, 6)
+  inputTokens        Int?
+  outputTokens       Int?
+  attemptCount       Int                 @default(0)
+  progress           Int                 @default(0)
+  errorCode          String?
+  errorMessage       String?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  assets       Asset[]
+  usageEntries UsageLedger[]
+  exports      Export[]
+
+  @@index([projectId, status])
+  @@index([sceneId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model ProviderCredential {
+  id                String           @id @default(uuid()) @db.Uuid
+  userId            String           @db.Uuid
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider          String
+  encryptedSecret   String
+  keyHint           String
+  status            CredentialStatus @default(ACTIVE)
+  lastValidatedAt   DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@unique([userId, provider])
+}
+
+model Export {
+  id              String       @id @default(uuid()) @db.Uuid
+  projectId       String       @db.Uuid
+  project         Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  generationJobId String?      @db.Uuid
+  generationJob   GenerationJob? @relation(fields: [generationJobId], references: [id], onDelete: SetNull)
+  type            ExportType
+  status          ExportStatus @default(PENDING)
+  storageKey      String?
+  manifest        Json?
+  createdAt       DateTime     @default(now())
+  completedAt     DateTime?
+
+  @@index([projectId, createdAt])
+}
+
+model UsageLedger {
+  id              String          @id @default(uuid()) @db.Uuid
+  userId          String          @db.Uuid
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId       String?         @db.Uuid
+  project         Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  generationJobId String?         @db.Uuid
+  generationJob   GenerationJob?  @relation(fields: [generationJobId], references: [id], onDelete: SetNull)
+  type            LedgerEntryType
+  credits         Int
+  providerCostUsd Decimal?        @db.Decimal(12, 6)
+  metadata        Json?
+  createdAt       DateTime        @default(now())
+
+  @@index([userId, createdAt])
+  @@index([projectId, createdAt])
+  @@index([generationJobId])
+}
