@@ -23,6 +23,7 @@ const nav = [
   ["Voiceover", Mic2, "voice"],
   ["Scene Review", Clapperboard, "scenes"],
   ["Storyboard", Film, "storyboard"],
+  ["Flow Generation", Film, "flow"],
   ["Captions", Captions, "captions"],
   ["Review", PlaySquare, "review"],
   ["Export", Film, "export"],
