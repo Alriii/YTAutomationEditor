@@ -51,6 +51,14 @@ export async function signR2Put(input: {
   );
 }
 
+export async function getR2Object(storageKey: string): Promise<Buffer> {
+  const result = await r2Client().send(
+    new GetObjectCommand({ Bucket: r2Bucket(), Key: storageKey }),
+  );
+  if (!result.Body) throw new Error(`R2 object has no body: ${storageKey}`);
+  return Buffer.from(await result.Body.transformToByteArray());
+}
+
 export async function putR2Object(input: {
   storageKey: string;
   bytes: Uint8Array | Buffer;
