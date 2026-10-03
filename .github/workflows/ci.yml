@@ -34,5 +34,6 @@ jobs:
       - run: bash -n start-continuity.sh
       - run: docker compose -f docker-compose.local.yml config
       - run: docker compose -f docker-compose.local.yml build renderer
+      - run: bash scripts/smoke-render.sh
       - run: pnpm test
       - run: pnpm build

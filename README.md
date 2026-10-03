@@ -382,6 +382,7 @@ node --check scripts/setup-local.mjs
 node --check scripts/local-dev.mjs
 docker compose -f docker-compose.local.yml config
 docker compose -f docker-compose.local.yml build renderer
+bash scripts/smoke-render.sh
 pnpm test
 pnpm build
 ```
