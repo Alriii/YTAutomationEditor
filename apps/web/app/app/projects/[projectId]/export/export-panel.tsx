@@ -23,7 +23,7 @@ type BridgeJob = {
   durationMs?: number;
 };
 
-const RENDER_BRIDGE = "http://127.0.0.1:4318";
+const RENDER_BRIDGE = "/api/v1/local-bridge/render";
 
 function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -134,7 +134,7 @@ export function ExportPanel({
     } catch {
       setRendererOnline(false);
       setVideoMessage(
-        "Render bridge is offline. Run: pnpm render:bridge",
+        "Render bridge is offline on the PC. Start Continuity Studio with pnpm local:dev.",
       );
       return false;
     }

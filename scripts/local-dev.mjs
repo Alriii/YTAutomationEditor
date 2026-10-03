@@ -1,10 +1,34 @@
 import { spawn } from "node:child_process";
 import net from "node:net";
+import os from "node:os";
 import process from "node:process";
 
 const isWindows = process.platform === "win32";
 const children = new Map();
 let shuttingDown = false;
+
+function privateIpv4(address) {
+  return (
+    address.startsWith("10.") ||
+    address.startsWith("192.168.") ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(address)
+  );
+}
+
+function lanAddress() {
+  for (const entries of Object.values(os.networkInterfaces())) {
+    for (const entry of entries ?? []) {
+      if (
+        entry.family === "IPv4" &&
+        !entry.internal &&
+        privateIpv4(entry.address)
+      ) {
+        return entry.address;
+      }
+    }
+  }
+  return undefined;
+}
 
 function command(bin, args) {
   return [bin, ...args].join(" ");
@@ -313,6 +337,10 @@ async function main() {
 
   console.log("\nReady:");
   console.log("  Studio      http://localhost:3000");
+  const phoneHost = lanAddress();
+  if (phoneHost) {
+    console.log(`  Phone/APK   http://${phoneHost}:3000`);
+  }
   console.log("  Flow bridge http://127.0.0.1:4317");
   console.log("  Renderer    http://127.0.0.1:4318");
   console.log("  Inngest     http://127.0.0.1:8288");

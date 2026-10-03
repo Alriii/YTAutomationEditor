@@ -30,7 +30,7 @@ type SceneRun = {
   message?: string;
 };
 
-const BRIDGE = "http://127.0.0.1:4317";
+const BRIDGE = "/api/v1/local-bridge/flow";
 
 async function sha256(file: File): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
@@ -91,7 +91,7 @@ export function FlowGeneration({
     } catch {
       setBridgeOnline(false);
       setMessage(
-        "Flow bridge is offline. Run pnpm flow:bridge in another terminal.",
+        "Flow bridge is offline on the PC. Start Continuity Studio with pnpm local:dev.",
       );
     }
   }
@@ -105,7 +105,7 @@ export function FlowGeneration({
       );
     } catch {
       setBridgeOnline(false);
-      setMessage("Start pnpm flow:bridge first.");
+      setMessage("Start Continuity Studio on the PC with pnpm local:dev.");
     }
   }
 

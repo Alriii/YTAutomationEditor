@@ -85,11 +85,11 @@ export function LocalSystemStatus() {
         })
         .catch(() => null),
       bridgeHealth(
-        "http://127.0.0.1:4317/health",
+        "/api/v1/local-bridge/flow/health",
         "continuity-flow-bridge",
       ),
       bridgeHealth(
-        "http://127.0.0.1:4318/health",
+        "/api/v1/local-bridge/render/health",
         "continuity-render-bridge",
       ),
     ]);
