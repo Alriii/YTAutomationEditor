@@ -20,7 +20,9 @@
     "local:setup": "node scripts/setup-local.mjs",
     "local:infra": "docker compose -f docker-compose.local.yml up -d --wait postgres minio inngest && docker compose -f docker-compose.local.yml run --rm minio-init",
     "local:down": "docker compose -f docker-compose.local.yml down",
-    "local:start": "pnpm local:setup && pnpm local:infra && pnpm db:generate && pnpm db:push"
+    "local:start": "pnpm local:setup && pnpm local:infra && pnpm local:renderer && pnpm db:generate && pnpm db:push",
+    "render:bridge": "node scripts/render-bridge.mjs",
+    "local:renderer": "docker compose -f docker-compose.local.yml build renderer"
   },
   "devDependencies": {
     "turbo": "^2.5.8",

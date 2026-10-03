@@ -48,6 +48,16 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  renderer:
+    build:
+      context: .
+      dockerfile: Dockerfile.renderer
+    image: continuity-studio-renderer:local
+    working_dir: /work
+    volumes:
+      - ./.local-render:/work
+    entrypoint: ["ffmpeg"]
+
 volumes:
   continuity_postgres:
   continuity_minio:

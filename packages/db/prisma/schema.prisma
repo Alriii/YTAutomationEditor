@@ -106,6 +106,7 @@ enum CredentialStatus {
 
 enum ExportType {
   ASSET_ZIP
+  VIDEO_MP4
   MANIFEST
 }
 
