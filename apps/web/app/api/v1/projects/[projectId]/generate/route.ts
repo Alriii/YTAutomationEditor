@@ -4,6 +4,7 @@ import { requireOwnedProject } from "@/lib/auth";
 import { errorResponse } from "@/lib/http";
 import { buildProjectGenerationEstimate } from "@/lib/generation/estimate";
 import { inngest } from "@/inngest/client";
+import { getProviderApiKey } from "@/lib/providers/credentials";
 
 const schema = z.object({
   provider: z.literal("google"),
@@ -18,6 +19,9 @@ export async function POST(request: Request, context: Context) {
     const { projectId } = await context.params;
     const { user } = await requireOwnedProject(projectId);
     const input = schema.parse(await request.json());
+
+    // Fail before queuing any work if no Google key is configured.
+    await getProviderApiKey(user.id, "google");
 
     const estimate = await buildProjectGenerationEstimate({
       projectId,

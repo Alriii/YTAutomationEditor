@@ -22,7 +22,7 @@ export async function buildProjectGenerationEstimate(input: {
   }
 
   const provider = getImageProvider(input.provider);
-  const hasByok = Boolean(
+  const hasStoredCredential = Boolean(
     await db.providerCredential.findUnique({
       where: {
         userId_provider: {
@@ -32,6 +32,9 @@ export async function buildProjectGenerationEstimate(input: {
       },
     }),
   );
+  const hasPlatformGoogleKey =
+    input.provider === "google" && Boolean(process.env.GEMINI_API_KEY);
+  const hasByok = hasStoredCredential || hasPlatformGoogleKey;
 
   const compiled: Array<{
     sceneId: string;
@@ -67,7 +70,7 @@ export async function buildProjectGenerationEstimate(input: {
     });
 
     estimatedUsd += cost.estimatedUsd;
-    const credits = hasByok ? 0 : cost.estimatedCredits;
+    const credits = input.provider === "google" ? 0 : hasByok ? 0 : cost.estimatedCredits;
     estimatedCredits += credits;
     compiled.push({
       sceneId: scene.id,
