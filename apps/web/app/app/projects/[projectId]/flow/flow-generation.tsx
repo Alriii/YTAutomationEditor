@@ -108,22 +108,24 @@ export function FlowGeneration({ projectId }: { projectId: string }) {
     }
 
     setPlan(body);
-    setRuns(
-      Object.fromEntries(
-        body.scenes.map((scene) => [
-          scene.sceneId,
-          {
-            state:
-              scene.locked || scene.hasSelectedAsset ? "skipped" : "idle",
-            message: scene.locked
-              ? "Locked"
-              : scene.hasSelectedAsset
-                ? "Already has selected image"
-                : undefined,
-          },
-        ]),
-      ),
-    );
+
+    const nextRuns: Record<string, SceneRun> = {};
+    for (const scene of body.scenes) {
+      if (scene.locked) {
+        nextRuns[scene.sceneId] = {
+          state: "skipped",
+          message: "Locked",
+        };
+      } else if (scene.hasSelectedAsset) {
+        nextRuns[scene.sceneId] = {
+          state: "skipped",
+          message: "Already has selected image",
+        };
+      } else {
+        nextRuns[scene.sceneId] = { state: "idle" };
+      }
+    }
+    setRuns(nextRuns);
     setMessage(
       `Prepared ${body.scenes.length} scenes for ${body.model}.`,
     );

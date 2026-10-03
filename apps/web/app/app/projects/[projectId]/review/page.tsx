@@ -49,7 +49,10 @@ export default async function ReviewPage({
           ? (scene.mediaSettings as Record<string, unknown>)
           : {};
 
-      return ({
+      const fit: "cover" | "contain" =
+        raw.fit === "contain" ? "contain" : "cover";
+
+      return {
       id: scene.id,
       sceneNumber: scene.sceneNumber,
       title: scene.title ?? "",
@@ -59,12 +62,12 @@ export default async function ReviewPage({
         ? await signR2Get(scene.selectedAsset.storageKey, 1800)
         : null,
       framing: {
-        fit: raw.fit === "contain" ? "contain" : "cover",
+        fit,
         scale: typeof raw.scale === "number" ? raw.scale : 1,
         x: typeof raw.x === "number" ? raw.x : 0,
         y: typeof raw.y === "number" ? raw.y : 0,
       },
-    });
+    };
     }),
   );
 
