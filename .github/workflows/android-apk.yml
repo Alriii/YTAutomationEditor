@@ -1,0 +1,46 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "android-client/**"
+      - ".github/workflows/android-apk.yml"
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 35 SDK
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "8.10.2"
+          cache-provider: basic
+
+      - name: Build installable APK
+        run: gradle -p android-client :app:assembleDebug --stacktrace
+
+      - name: Name APK
+        run: cp android-client/app/build/outputs/apk/debug/app-debug.apk Continuity-Studio-S23.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Continuity-Studio-S23-APK
+          path: Continuity-Studio-S23.apk
+          if-no-files-found: error
+          retention-days: 30
