@@ -1,5 +1,6 @@
 import sharp from "sharp";
 import { db } from "@continuity/db";
+import { toSrt } from "@continuity/shared";
 import { inngest } from "../client";
 import { createZip } from "@/lib/export/zip";
 import { getR2Object, putR2Object } from "@/lib/storage/r2";
@@ -54,7 +55,8 @@ export const exportProjectFunction = inngest.createFunction(
       const exportRecord = await db.export.findUnique({ where: { id: input.exportId } });
       if (!exportRecord) throw new Error("Export record not found.");
 
-      const scenes = await db.scene.findMany({
+      const [scenes, voiceTrack, subtitleCues] = await Promise.all([
+        db.scene.findMany({
         where: { projectId: job.projectId },
         orderBy: { sceneNumber: "asc" },
         include: {
@@ -62,7 +64,22 @@ export const exportProjectFunction = inngest.createFunction(
             select: { id: true, storageKey: true, mimeType: true },
           },
         },
-      });
+        }),
+        db.projectTrack.findUnique({
+          where: {
+            projectId_type: {
+              projectId: job.projectId,
+              type: "VOICEOVER",
+            },
+          },
+          include: { asset: true },
+        }),
+        db.subtitleCue.findMany({
+          where: { projectId: job.projectId },
+          orderBy: [{ startMs: "asc" }, { order: "asc" }],
+        }),
+      ]);
+
       if (!scenes.length || scenes.some((scene) => !scene.selectedAsset)) {
         throw new Error("Every scene must have a selected asset.");
       }
@@ -85,6 +102,18 @@ export const exportProjectFunction = inngest.createFunction(
         projectTitle: job.project.title,
         aspectRatio: job.project.aspectRatio,
         exportId: exportRecord.id,
+        voiceover: voiceTrack?.asset
+          ? {
+              storageKey: voiceTrack.asset.storageKey,
+              mimeType: voiceTrack.asset.mimeType,
+            }
+          : null,
+        subtitleCues: subtitleCues.map((cue) => ({
+          order: cue.order,
+          startMs: cue.startMs,
+          endMs: cue.endMs,
+          text: cue.text,
+        })),
         scenes: scenes.map((scene) => ({
           number: scene.sceneNumber,
           narration: scene.narration,
@@ -120,6 +149,28 @@ export const exportProjectFunction = inngest.createFunction(
         cursorMs += scene.durationMs;
       }
 
+      let voiceoverFile = null;
+      if (data.voiceover) {
+        const voiceBytes = await getR2Object(data.voiceover.storageKey);
+        const extension =
+          data.voiceover.mimeType === "audio/mpeg"
+            ? "mp3"
+            : data.voiceover.mimeType.includes("wav")
+              ? "wav"
+              : "m4a";
+        voiceoverFile = `voiceover.${extension}`;
+        files.push({ name: voiceoverFile, bytes: voiceBytes });
+      }
+
+      let subtitleFile = null;
+      if (data.subtitleCues.length) {
+        subtitleFile = "subtitles.srt";
+        files.push({
+          name: subtitleFile,
+          bytes: Buffer.from(toSrt(data.subtitleCues), "utf8"),
+        });
+      }
+
       const manifest = {
         schemaVersion: 1,
         project: {
@@ -128,6 +179,8 @@ export const exportProjectFunction = inngest.createFunction(
           aspectRatio: data.aspectRatio,
         },
         totalDurationMs: cursorMs,
+        voiceoverFile,
+        subtitleFile,
         scenes: manifestScenes,
       };
 
