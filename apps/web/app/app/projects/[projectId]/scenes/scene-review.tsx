@@ -61,7 +61,7 @@ export function SceneReview({
   async function saveScene(scene: Scene) {
     setBusy(scene.id);
     setMessage(undefined);
-    const response = await fetch(`/api/v1/scenes/\${scene.id}`, {
+    const response = await fetch(`/api/v1/scenes/${scene.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -87,13 +87,13 @@ export function SceneReview({
         item.id === scene.id ? { ...item, status: "REVIEW" } : item,
       ),
     );
-    setMessage(`Scene \${scene.sceneNumber} saved. Re-approval required.`);
+    setMessage(`Scene ${scene.sceneNumber} saved. Re-approval required.`);
   }
 
   async function approveAll() {
     setBusy("approve");
     setMessage(undefined);
-    const response = await fetch(`/api/v1/projects/\${projectId}/scenes/approve`, {
+    const response = await fetch(`/api/v1/projects/${projectId}/scenes/approve`, {
       method: "POST",
     });
     const body = (await response.json()) as { approved?: number; error?: string };
@@ -101,13 +101,13 @@ export function SceneReview({
     if (!response.ok) return setMessage(body.error ?? "Approval failed.");
     setScenes((current) => current.map((scene) => ({ ...scene, status: "APPROVED" })));
     setEstimate(undefined);
-    setMessage(`\${body.approved ?? scenes.length} scenes approved. Calculate cost next.`);
+    setMessage(`${body.approved ?? scenes.length} scenes approved. Calculate cost next.`);
   }
 
   async function calculateEstimate() {
     setBusy("estimate");
     setMessage(undefined);
-    const response = await fetch(`/api/v1/projects/\${projectId}/estimate`, {
+    const response = await fetch(`/api/v1/projects/${projectId}/estimate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ provider, model }),
@@ -122,7 +122,7 @@ export function SceneReview({
     if (!estimate) return;
     setBusy("generate");
     setMessage(undefined);
-    const response = await fetch(`/api/v1/projects/\${projectId}/generate`, {
+    const response = await fetch(`/api/v1/projects/${projectId}/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -134,8 +134,8 @@ export function SceneReview({
     const body = (await response.json()) as { queued?: number; error?: string };
     setBusy(undefined);
     if (!response.ok) return setMessage(body.error ?? "Could not start generation.");
-    setMessage(`\${body.queued ?? 0} scene jobs queued.`);
-    router.push(`/app/projects/\${projectId}/storyboard`);
+    setMessage(`${body.queued ?? 0} scene jobs queued.`);
+    router.push(`/app/projects/${projectId}/storyboard`);
     router.refresh();
   }
 
