@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { db } from "@continuity/db";
 import { requireOwnedProject } from "@/lib/auth";
+import { LocalSystemStatus } from "@/components/local-system-status";
 
 export default async function ProjectOverview({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
@@ -37,6 +38,8 @@ export default async function ProjectOverview({ params }: { params: Promise<{ pr
           Script → Style / Master Reference → Cast & World → Voiceover → Scene Breakdown → <strong>Human Scene Review</strong> → Storyboard → Flow Generation → Captions → Review → Export
         </div>
       </div>
+
+      {process.env.LOCAL_MODE === "true" && <LocalSystemStatus />}
 
       <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {cards.map(([title, status, slug]) => (
