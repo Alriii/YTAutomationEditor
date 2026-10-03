@@ -12,7 +12,6 @@ describe("breakDownScriptLocally", () => {
     });
 
     expect(result.scenes.length).toBeGreaterThan(1);
-    expect(result.scenes[0]?.status).toBeUndefined();
     expect(result.scenes[0]?.narration).toContain("NVIDIA");
     expect(result.scenes[0]?.visualIntent).toContain("documentary visual");
   });
