@@ -1,10 +1,10 @@
 import { PassThrough } from "node:stream";
-import archiver from "archiver";
+import { ZipArchive } from "archiver";
 
 export async function createZip(
   files: Array<{ name: string; bytes: Buffer }>,
 ): Promise<Buffer> {
-  const archive = archiver("zip", { zlib: { level: 8 } });
+  const archive = new ZipArchive({ zlib: { level: 8 } });
   const output = new PassThrough();
   const chunks: Buffer[] = [];
 
