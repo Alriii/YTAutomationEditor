@@ -35,5 +35,6 @@ android {
 }
 
 dependencies {
+    implementation "androidx.core:core:1.15.0"
     implementation "dev.ffmpegkit-maintained:ffmpeg-kit-full:8.1.7"
 }
