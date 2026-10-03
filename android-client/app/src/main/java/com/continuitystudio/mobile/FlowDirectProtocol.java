@@ -43,6 +43,18 @@ public final class FlowDirectProtocol {
 
     private FlowDirectProtocol() {}
 
+    public enum ImageInputType {
+        UNKNOWN("IMAGE_INPUT_TYPE_UNKNOWN"),
+        REFERENCE("IMAGE_INPUT_TYPE_REFERENCE"),
+        BASE_IMAGE("IMAGE_INPUT_TYPE_BASE_IMAGE");
+
+        public final String protoValue;
+
+        ImageInputType(String protoValue) {
+            this.protoValue = protoValue;
+        }
+    }
+
     public enum ImageAspectRatio {
         LANDSCAPE_16_9("16:9", "IMAGE_ASPECT_RATIO_LANDSCAPE"),
         PORTRAIT_9_16("9:16", "IMAGE_ASPECT_RATIO_PORTRAIT"),

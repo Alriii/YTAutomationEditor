@@ -131,6 +131,58 @@ High-confidence generation lifecycle:
 7. Persist successful media into the Continuity Studio scene.
 8. Optionally cancel through `flowMedia:cancelGeneration`.
 
+## Reference-image input
+
+Observed generated type:
+
+- `ImageGenerationImageInput`
+
+Observed accessors:
+
+- `mediaKey`
+- `imageInputType`
+
+Observed enum values:
+
+- `IMAGE_INPUT_TYPE_UNKNOWN`
+- `IMAGE_INPUT_TYPE_REFERENCE`
+- `IMAGE_INPUT_TYPE_BASE_IMAGE`
+
+The app contains `GenerationMediaInputAssetIdExtension|toReferenceImageInput` and runtime errors such as `Could not resolve media key for reference image`, strongly confirming that an uploaded reference is converted into an image input keyed by the uploaded Flow `mediaKey`.
+
+Reference limits are model-driven. Observed model fields include:
+
+- `modelKey`
+- `displayName`
+- `maxInputReferences`
+- `supportedAspectRatios`
+- `serviceTier`
+- `generationConfiguration`
+
+Runtime text `Resolved maxInputReferences for modelKey:` confirms the limit should be read from model configuration rather than hard-coded.
+
+## Polling result shape
+
+Observed generated type:
+
+- `BatchGetMediaResponse.MediaResult`
+
+Observed response/accessor concepts:
+
+- `results`
+- `media`
+- `error`
+- `mediaGenerationStatus`
+- `mediaGenerationId`
+
+The client also logs `Polling timed out after` and contains status parsing helpers. Continuity Studio should therefore treat polling as a per-result state machine: pending → terminal media or terminal error.
+
+## Parent resource
+
+The binary contains the resource pattern `flowProjects/*` alongside `projectId` and the route `v1/{+parent}/flowMedia:batchGenerateImages`.
+
+**High-confidence inference:** generation parent resources are likely shaped as `flowProjects/<project-id>`. This must still be confirmed before Flow Direct is enabled.
+
 ## Aspect-ratio enums
 
 Observed image enum strings:
