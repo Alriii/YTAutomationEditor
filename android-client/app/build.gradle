@@ -39,3 +39,12 @@ dependencies {
     implementation "com.google.android.gms:play-services-auth:21.2.0"
     implementation "dev.ffmpegkit-maintained:ffmpeg-kit-full:8.1.7"
 }
+
+
+configurations.configureEach {
+    resolutionStrategy.force(
+        "org.jetbrains.kotlin:kotlin-stdlib:1.8.22",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22"
+    )
+}
