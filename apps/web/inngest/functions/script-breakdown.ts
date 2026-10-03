@@ -99,7 +99,7 @@ export const scriptBreakdownFunction = inngest.createFunction(
     const breakdown = await step.run("generate-breakdown", async () => {
       const apiKey = await getProviderApiKey(snapshot.userId, "google");
 
-      return breakDownScriptWithOpenAI({
+      return breakDownScriptWithGemini({
         apiKey,
         model: snapshot.model,
         projectTitle: snapshot.projectTitle,
