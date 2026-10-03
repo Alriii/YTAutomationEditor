@@ -71,7 +71,8 @@ That command:
 6. creates the private `continuity` bucket
 7. starts the Inngest Dev Server
 8. generates Prisma
-9. pushes the development database schema
+9. builds the local FFmpeg renderer image
+10. pushes the development database schema
 
 Then start the web app:
 
@@ -102,6 +103,14 @@ pnpm flow:bridge
 
 On first use, sign into Google in the browser opened by the bridge and select or create the Flow project you want Continuity Studio to use.
 
+For final MP4 rendering, run one more local bridge:
+
+```bash
+pnpm render:bridge
+```
+
+The Export screen can then render the reviewed project locally with Docker + FFmpeg and upload the finished MP4 back into the project's private storage.
+
 Stop local infrastructure with:
 
 ```bash
@@ -116,6 +125,7 @@ PostgreSQL and MinIO use Docker volumes, so stopping containers does not erase p
 | --- | --- |
 | Continuity Studio | `http://localhost:3000` |
 | Flow bridge | `http://127.0.0.1:4317` |
+| Render bridge | `http://127.0.0.1:4318` |
 | Inngest Dev UI | `http://127.0.0.1:8288` |
 | MinIO API | `http://127.0.0.1:9000` |
 | MinIO Console | `http://127.0.0.1:9001` |
@@ -181,7 +191,7 @@ Manual scene images enter the same scene render history as Flow-generated images
 
 The Voiceover stage keeps one active master narration track. Replacing the active track does not delete older media assets.
 
-The Review player uses the active voiceover as its playback clock.
+The upload step reads the real audio duration. That duration becomes the project timeline target, existing scene durations are proportionally fitted to it, captions can use it, Review follows it, and Export uses the same fitted timing. The Review player uses the active voiceover as its playback clock.
 
 ## Captions
 
@@ -264,7 +274,29 @@ Characters
 
 ## Export
 
-The current ZIP package contains:
+Continuity Studio now has two export paths.
+
+### Final MP4
+
+The Export screen can render a final MP4 locally with the free FFmpeg Docker renderer.
+
+The renderer applies:
+
+- project aspect ratio
+- fitted scene durations
+- selected scene images
+- saved crop/fit/zoom position
+- zoom and pan motion
+- cut/fade transitions
+- active voiceover
+- saved SRT captions
+- saved subtitle appearance
+
+Rendering happens on the creator's machine. The render bridge uploads the finished MP4 back to private project storage, where the Export screen shows an in-app video player and MP4 download link.
+
+### Portable source ZIP
+
+The ZIP package contains:
 
 ```text
 SCENE_001.jpg
@@ -289,7 +321,7 @@ The manifest preserves:
 - subtitle filename
 - subtitle style/settings
 
-A final rendered MP4 exporter is the next major finishing milestone.
+The ZIP and MP4 paths are independent, so creators can keep an editable source package even after rendering the final video.
 
 ## Hosted mode
 
@@ -311,7 +343,7 @@ If `S3_ENDPOINT` is configured, generic S3 storage is used. Otherwise storage fa
 
 For hosted deployment, use `.env.example` and configure the hosted services you select.
 
-Useful Flow bridge overrides:
+Useful local bridge overrides:
 
 | Variable | Purpose |
 | --- | --- |
@@ -319,6 +351,8 @@ Useful Flow bridge overrides:
 | `FLOW_ALLOWED_ORIGIN` | web origin allowed to call bridge |
 | `FLOW_PROFILE_DIR` | local persistent browser profile |
 | `FLOW_BROWSER_PATH` | explicit Chrome/Edge/Brave path |
+| `RENDER_BRIDGE_PORT` | render bridge port, default 4318 |
+| `RENDER_ALLOWED_ORIGIN` | web origin allowed to call the render bridge |
 
 ## Security
 
@@ -342,8 +376,10 @@ CI runs:
 pnpm db:generate
 pnpm typecheck
 node --check scripts/flow-bridge.mjs
+node --check scripts/render-bridge.mjs
 node --check scripts/setup-local.mjs
 docker compose -f docker-compose.local.yml config
+docker compose -f docker-compose.local.yml build renderer
 pnpm test
 pnpm build
 ```
@@ -353,7 +389,6 @@ There is intentionally no `actions/setup-node` dependency cache yet because the 
 ## Still outside the current slice
 
 - full professional NLE timeline
-- final MP4 rendering
 - CapCut/Premiere project exporters
 - team collaboration
 - marketplace
