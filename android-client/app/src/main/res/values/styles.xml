@@ -1,14 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
-        <item name="android:fontFamily">sans</item>
-        <item name="android:windowActionModeOverlay">true</item>
-        <item name="android:colorAccent">@color/studio_accent</item>
-        <item name="android:navigationBarColor">@color/studio_bg</item>
-        <item name="android:statusBarColor">@color/studio_bg</item>
+    <style name="AppTheme" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/accent_violet</item>
+        <item name="colorOnPrimary">@color/text_white</item>
+        <item name="colorSecondary">@color/accent_purple</item>
+        <item name="colorOnSecondary">@color/text_white</item>
+        <item name="android:colorBackground">@color/background_navy</item>
+        <item name="colorSurface">@color/card_dark_blue_purple</item>
+        <item name="colorOnSurface">@color/text_light_gray</item>
+        <item name="colorError">@color/error_red</item>
+        <item name="android:statusBarColor">@color/background_navy</item>
+        <item name="android:navigationBarColor">@color/background_navy</item>
+        <item name="android:windowBackground">@color/background_navy</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
-        <item name="android:windowBackground">@color/studio_bg</item>
-        <item name="android:windowNoTitle">true</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="materialCardViewStyle">@style/Widget.ContinuityStudio.Card</item>
+    </style>
+
+    <style name="Widget.ContinuityStudio.Card" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardBackgroundColor">@color/card_dark_blue_purple</item>
+        <item name="cardCornerRadius">18dp</item>
+        <item name="cardElevation">4dp</item>
+        <item name="strokeWidth">0dp</item>
     </style>
 </resources>

@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Continuity Studio</string>
+    <string name="home">Home</string>
+    <string name="generate">Generate</string>
+    <string name="storyboard">Storyboard</string>
+    <string name="export">Export</string>
+    <string name="new_project">+ New Project</string>
+    <string name="no_project">No project selected</string>
+    <string name="open_in_google_flow">Open in Google Flow</string>
+    <string name="regenerate_in_google_flow">Regenerate in Google Flow</string>
+    <string name="import_flow_result">Import Flow Result</string>
 </resources>
