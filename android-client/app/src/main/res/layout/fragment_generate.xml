@@ -116,7 +116,7 @@
             android:padding="14dp"
             android:background="@drawable/bg_input"
             android:hint="Paste or edit this scene's exact narration…"
-            android:hintTextColor="@color/unselected_gray"
+            android:textColorHint="@color/unselected_gray"
             android:inputType="textMultiLine|textCapSentences"
             android:textColor="@color/text_white"
             android:textSize="14sp" />
