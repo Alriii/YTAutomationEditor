@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="@color/background_navy">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Google Flow Generation"
+            android:textColor="@color/text_white"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/generate_project_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:layout_marginBottom="14dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            app:cardBackgroundColor="@color/card_elevated"
+            app:cardCornerRadius="18dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="FLOW TARGET"
+                    android:textColor="@color/accent_violet"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.1" />
+                <Spinner
+                    android:id="@+id/model_spinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="ASPECT RATIO"
+                    android:textColor="@color/accent_violet"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.1" />
+                <Spinner
+                    android:id="@+id/aspect_spinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:layout_marginBottom="9dp">
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_prev_scene"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="‹"
+                app:cornerRadius="12dp" />
+            <TextView
+                android:id="@+id/scene_info"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:textColor="@color/text_light_gray"
+                android:textSize="12sp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_next_scene"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="›"
+                app:cornerRadius="12dp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SCENE NARRATION"
+            android:textColor="@color/text_secondary"
+            android:textSize="10sp"
+            android:letterSpacing="0.1" />
+
+        <EditText
+            android:id="@+id/narration_edit"
+            android:layout_width="match_parent"
+            android:layout_height="150dp"
+            android:layout_marginTop="7dp"
+            android:gravity="top|start"
+            android:padding="14dp"
+            android:background="@drawable/bg_input"
+            android:hint="Paste or edit this scene's exact narration…"
+            android:hintTextColor="@color/unselected_gray"
+            android:inputType="textMultiLine|textCapSentences"
+            android:textColor="@color/text_white"
+            android:textSize="14sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:layout_marginTop="12dp">
+            <TextView
+                android:id="@+id/ref_count"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_add_refs"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+ References"
+                android:textColor="@color/accent_violet"
+                app:strokeColor="@color/accent_violet"
+                app:cornerRadius="12dp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_clear_refs"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Clear" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_open_flow"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="12dp"
+            android:text="@string/open_in_google_flow"
+            android:textSize="15sp"
+            android:backgroundTint="@color/accent_violet"
+            app:cornerRadius="14dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_import_result"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="9dp"
+            android:text="@string/import_flow_result"
+            android:textColor="@color/accent_violet"
+            app:strokeColor="@color/accent_violet"
+            app:cornerRadius="14dp" />
+
+        <ImageView
+            android:id="@+id/scene_preview"
+            android:layout_width="match_parent"
+            android:layout_height="240dp"
+            android:layout_marginTop="14dp"
+            android:background="@color/black"
+            android:scaleType="fitCenter"
+            android:contentDescription="Scene preview" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="14dp">
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_add_scene"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="+ Scene"
+                app:cornerRadius="12dp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_import_script"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Import Script"
+                app:cornerRadius="12dp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/generate_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Flow mode · prompt copied automatically · project remains in Continuity Studio"
+            android:textColor="@color/success_green"
+            android:textSize="11sp"
+            android:lineSpacingExtra="2dp" />
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

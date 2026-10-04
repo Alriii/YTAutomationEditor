@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_navy"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Review & Export"
+            android:textColor="@color/text_white"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/export_summary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:layout_marginBottom="14dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <VideoView
+            android:id="@+id/export_video"
+            android:layout_width="match_parent"
+            android:layout_height="230dp"
+            android:background="@color/black"
+            android:visibility="gone" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            app:cardBackgroundColor="@color/card_dark_blue_purple"
+            app:cardCornerRadius="18dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="VOICEOVER & SUBTITLES"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="10sp"
+                    android:letterSpacing="0.1" />
+                <TextView
+                    android:id="@+id/voiceover_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="7dp"
+                    android:textColor="@color/text_light_gray"
+                    android:textSize="12sp" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_voiceover"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="9dp"
+                    android:text="Choose Voiceover"
+                    android:textColor="@color/accent_violet"
+                    app:strokeColor="@color/accent_violet"
+                    app:cornerRadius="12dp" />
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switch_subtitles"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Burn subtitles into video"
+                    android:textColor="@color/text_white" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_save_srt"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Save SRT to Downloads" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            app:cardBackgroundColor="@color/card_dark_blue_purple"
+            app:cardCornerRadius="18dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="EXPORT QUALITY"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="10sp"
+                    android:letterSpacing="0.1" />
+                <Spinner
+                    android:id="@+id/export_quality"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_export_mp4"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp"
+                    android:text="Export MP4"
+                    android:backgroundTint="@color/accent_violet"
+                    app:cornerRadius="14dp" />
+                <ProgressBar
+                    android:id="@+id/export_progress"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="10dp"
+                    android:visibility="gone" />
+                <TextView
+                    android:id="@+id/export_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Exports save to Downloads/Continuity Studio/Exports"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>
